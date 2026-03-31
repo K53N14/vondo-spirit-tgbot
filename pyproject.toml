@@ -7,7 +7,7 @@ name = "group-member-guardian-bot"
 version = "0.1.0"
 description = "PTB bot scaffold for tracking group members and removing users from all groups"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
   "python-telegram-bot>=22.0,<23.0",
   "SQLAlchemy>=2.0,<3.0",

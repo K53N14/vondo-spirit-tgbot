@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +12,7 @@ class MembershipRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def upsert_chat(self, chat_id: int, title: str | None, chat_type: str, is_active: bool = True) -> Chat:
+    async def upsert_chat(self, chat_id: int, title: Optional[str], chat_type: str, is_active: bool = True) -> Chat:
         chat = await self.session.get(Chat, chat_id)
         if chat is None:
             chat = Chat(id=chat_id, title=title, type=chat_type, is_active=is_active)
@@ -21,7 +23,7 @@ class MembershipRepository:
             chat.is_active = is_active
         return chat
 
-    async def upsert_user(self, user_id: int, username: str | None, full_name: str, is_bot: bool) -> User:
+    async def upsert_user(self, user_id: int, username: Optional[str], full_name: str, is_bot: bool) -> User:
         user = await self.session.get(User, user_id)
         if user is None:
             user = User(id=user_id, username=username, full_name=full_name, is_bot=is_bot)
