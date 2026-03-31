@@ -1,10 +1,24 @@
+Metadata-Version: 2.4
+Name: group-member-guardian-bot
+Version: 0.1.0
+Summary: PTB bot scaffold for tracking group members and removing users from all groups
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: python-telegram-bot<23.0,>=22.0
+Requires-Dist: SQLAlchemy<3.0,>=2.0
+Requires-Dist: aiosqlite<1.0,>=0.20
+Requires-Dist: python-dotenv<2.0,>=1.0
+Provides-Extra: dev
+Requires-Dist: pytest<9.0,>=8.0; extra == "dev"
+Requires-Dist: ruff<1.0,>=0.5; extra == "dev"
+Requires-Dist: mypy<2.0,>=1.10; extra == "dev"
+
 # Group Member Guardian Bot (Scaffold)
 
 Скелет проекта на `python-telegram-bot` для сценария:
-
 - отслеживать изменения участников в группах;
 - хранить состояние участников в БД;
-- удалять выбранного пользователя из всех известных групп командой `/remove_everywhere <username>`.
+- удалять выбранного пользователя из всех известных групп командой `/remove_everywhere <user_id>`.
 
 ## Требования
 
@@ -34,14 +48,3 @@ python -m bot.main
 - Бот должен быть администратором в целевых группах.
 - Для массового удаления нужны права на ограничение пользователей в группах.
 - В проде рекомендуются Postgres + webhook + миграции (Alembic).
-
-## Команды
-
-- `/start` — приветствие и краткое описание возможностей.
-- `/help` — список команд и их назначение.
-- `/add_user <username>` — вручную добавить пользователя по username в БД (для OWNER_USER_IDS).
-- `/users` — показать всех пользователей, сохраненных в БД (для OWNER_USER_IDS).
-- `/delete_user <username>` — удалить пользователя из базы данных (для OWNER_USER_IDS).
-- `/sync_me` — синхронизировать ваш id/имя и участие в известных группах бота (только если ваш username уже есть в БД).
-- `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
-- `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
