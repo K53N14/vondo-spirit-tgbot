@@ -62,6 +62,13 @@ class MembershipService:
             repo = MembershipRepository(session)
             return await repo.list_users()
 
+    async def delete_user_by_username(self, username: str) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            deleted = await repo.delete_user_by_username(username)
+            await session.commit()
+            return deleted
+
     async def get_user_by_username(self, username: str) -> Optional[StoredUser]:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)

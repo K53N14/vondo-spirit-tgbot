@@ -122,6 +122,17 @@ class MembershipRepository:
         await self.session.flush()
         return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
 
+    async def delete_user_by_username(self, username: str) -> bool:
+        normalized = username.strip().lstrip("@")
+        stmt = select(User).where(User.username == normalized)
+        user = await self.session.scalar(stmt)
+        if user is None:
+            return False
+
+        await self.session.execute(delete(Membership).where(Membership.user_id == user.id))
+        await self.session.execute(delete(User).where(User.id == user.id))
+        return True
+
     async def list_user_active_chats(self, user_id: int) -> list[StoredUserChat]:
         stmt = (
             select(Chat.id, Chat.title, Chat.type, Membership.status)
