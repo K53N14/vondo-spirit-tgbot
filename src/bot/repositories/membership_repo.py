@@ -101,6 +101,13 @@ class MembershipRepository:
         chats = rows.all()
         return [StoredChat(chat_id=c.id, title=c.title, chat_type=c.type) for c in chats]
 
+    async def deactivate_chat(self, chat_id: int) -> bool:
+        chat = await self.session.get(Chat, chat_id)
+        if chat is None:
+            return False
+        chat.is_active = False
+        return True
+
     async def list_users(self) -> list[StoredUser]:
         stmt: Select[tuple[User]] = select(User).order_by(User.username.asc().nulls_last(), User.full_name.asc())
         rows = await self.session.scalars(stmt)

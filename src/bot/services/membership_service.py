@@ -89,6 +89,13 @@ class MembershipService:
             repo = MembershipRepository(session)
             return await repo.list_active_chats()
 
+    async def deactivate_chat(self, chat_id: int) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            deactivated = await repo.deactivate_chat(chat_id)
+            await session.commit()
+            return deactivated
+
     async def list_users(self) -> list[StoredUser]:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)

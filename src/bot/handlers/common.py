@@ -40,6 +40,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
+        "/groups — показать все группы, в которых бот сейчас учитывается (только OWNER_USER_IDS).\n"
+        "/remove_group <chat_id> — убрать группу из списка учитываемых (только OWNER_USER_IDS).\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
         "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
         "(только OWNER_USER_IDS)."
@@ -180,6 +182,55 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         lines.append(f"... и еще {len(users) - 200} пользователей")
 
     await update.message.reply_text("\n".join(lines))
+
+
+async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    chats = await service.list_active_chats()
+    if not chats:
+        await update.message.reply_text("Список групп пуст.")
+        return
+
+    lines = ["Группы, в которых бот учитывается:"]
+    for chat in chats:
+        title = chat.title or "(без названия)"
+        lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type}")
+
+    await update.message.reply_text("\n".join(lines))
+
+
+async def remove_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /remove_group <chat_id>")
+        return
+
+    try:
+        chat_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("chat_id должен быть целым числом.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    removed = await service.deactivate_chat(chat_id)
+    if not removed:
+        await update.message.reply_text(f"Группа с chat_id={chat_id} не найдена в базе.")
+        return
+
+    await update.message.reply_text(f"Группа с chat_id={chat_id} убрана из списка активных.")
 
 
 async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
