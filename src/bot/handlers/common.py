@@ -39,6 +39,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/add_user <username> — вручную добавить пользователя по username в БД (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
+        "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
         "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
         "(только OWNER_USER_IDS)."
@@ -94,6 +95,66 @@ async def delete_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     await update.message.reply_text(f"Пользователь @{username} удален из базы данных.")
+
+
+async def sync_me_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user is None or update.message is None:
+        return
+
+    username = (update.effective_user.username or "").strip()
+    if not username:
+        await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    existing_user = await service.get_user_by_username(username)
+    if existing_user is None:
+        await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_user <username>.")
+        return
+
+    await service.upsert_user_profile(
+        user_id=update.effective_user.id,
+        username=username,
+        full_name=update.effective_user.full_name,
+        is_bot=update.effective_user.is_bot,
+    )
+
+    chats = await service.list_active_chats()
+    synced = 0
+    member_of = 0
+    failed: list[str] = []
+
+    for chat in chats:
+        try:
+            member = await context.bot.get_chat_member(chat_id=chat.chat_id, user_id=update.effective_user.id)
+            status = member.status
+            await service.save_user_membership(
+                chat_id=chat.chat_id,
+                chat_title=chat.title,
+                chat_type=chat.chat_type,
+                user_id=update.effective_user.id,
+                username=username,
+                full_name=update.effective_user.full_name,
+                is_bot=update.effective_user.is_bot,
+                status=status,
+            )
+            synced += 1
+            if status in {"creator", "administrator", "member", "restricted"}:
+                member_of += 1
+        except Exception as exc:
+            failed.append(f"{chat.chat_id}: {exc}")
+
+    lines = [
+        f"Синхронизация завершена для @{username}.",
+        f"Проверено групп: {len(chats)}",
+        f"Записано статусов: {synced}",
+        f"Состоит в группах: {member_of}",
+    ]
+    if failed:
+        lines.append(f"Ошибок: {len(failed)}")
+        lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
+
+    await update.message.reply_text("\n".join(lines))
 
 
 async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
