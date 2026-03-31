@@ -40,6 +40,7 @@ def build_application() -> Application:
     app = Application.builder().token(settings.bot_token).post_init(post_init).post_shutdown(post_shutdown).build()
 
     app.bot_data["settings"] = settings
+    app.bot_data["engine"] = engine
     app.bot_data["owner_user_ids"] = settings.owner_user_ids
     app.bot_data["membership_service"] = membership_service
 
