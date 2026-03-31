@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import Chat, Membership, User
@@ -41,13 +41,32 @@ class MembershipRepository:
 
     async def upsert_user(self, user_id: int, username: Optional[str], full_name: str, is_bot: bool) -> User:
         user = await self.session.get(User, user_id)
-        if user is None:
-            user = User(id=user_id, username=username, full_name=full_name, is_bot=is_bot)
-            self.session.add(user)
-        else:
+        if user is not None:
             user.username = username
             user.full_name = full_name
             user.is_bot = is_bot
+            return user
+
+        existing_by_username: Optional[User] = None
+        if username:
+            stmt = select(User).where(User.username == username)
+            existing_by_username = await self.session.scalar(stmt)
+
+        if existing_by_username is not None and existing_by_username.id < 0:
+            real_user = User(id=user_id, username=username, full_name=full_name, is_bot=is_bot)
+            self.session.add(real_user)
+            await self.session.flush()
+
+            await self.session.execute(
+                update(Membership)
+                .where(Membership.user_id == existing_by_username.id)
+                .values(user_id=user_id)
+            )
+            await self.session.execute(delete(User).where(User.id == existing_by_username.id))
+            return real_user
+
+        user = User(id=user_id, username=username, full_name=full_name, is_bot=is_bot)
+        self.session.add(user)
         return user
 
     async def upsert_membership(self, chat_id: int, user_id: int, status: str, is_current: bool) -> Membership:
