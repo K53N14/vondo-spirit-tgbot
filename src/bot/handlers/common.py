@@ -1,0 +1,105 @@
+from __future__ import annotations
+
+from telegram import Update
+from telegram.ext import ContextTypes
+
+from bot.services.membership_service import MembershipService
+
+
+def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if update.effective_user is None:
+        return False
+    owner_ids: set[int] = context.application.bot_data["owner_user_ids"]
+    return update.effective_user.id in owner_ids
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    text = (
+        "Привет! Я бот для контроля участников в группах.\n\n"
+        "Что я умею:\n"
+        "• отслеживать изменения участников через chat_member обновления;\n"
+        "• хранить состояние участников в базе;\n"
+        "• удалять пользователя из всех известных групп командой администратора.\n\n"
+        "Напиши /help, чтобы увидеть список доступных команд."
+    )
+    await update.message.reply_text(text)
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    text = (
+        "Доступные команды:\n\n"
+        "/start — приветствие и краткое описание возможностей бота.\n"
+        "/help — список команд и их описание.\n"
+        "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
+        "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
+        "/remove_everywhere <user_id> — удалить пользователя из всех известных активных групп "
+        "(только для пользователей из OWNER_USER_IDS)."
+    )
+    await update.message.reply_text(text)
+
+
+async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    users = await service.list_users()
+    if not users:
+        await update.message.reply_text("В базе пока нет пользователей.")
+        return
+
+    lines = ["Пользователи в БД:"]
+    for user in users[:200]:
+        username = f"@{user.username}" if user.username else "(без username)"
+        lines.append(f"- {username} | id={user.id} | {user.full_name}")
+
+    if len(users) > 200:
+        lines.append(f"... и еще {len(users) - 200} пользователей")
+
+    await update.message.reply_text("\n".join(lines))
+
+
+async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /user_groups <username>")
+        return
+
+    username = context.args[0].strip().lstrip("@")
+    if not username:
+        await update.message.reply_text("Укажите корректный username.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    user, chats = await service.list_user_chats_by_username(username)
+
+    if user is None:
+        await update.message.reply_text(f"Пользователь @{username} не найден в базе.")
+        return
+
+    if not chats:
+        await update.message.reply_text(f"Пользователь @{username} найден, но не состоит в активных группах.")
+        return
+
+    lines = [f"Группы пользователя @{username} (id={user.id}):"]
+    for chat in chats:
+        title = chat.title or "(без названия)"
+        lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type} | status={chat.status}")
+
+    await update.message.reply_text("\n".join(lines))
