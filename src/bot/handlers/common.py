@@ -36,12 +36,37 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Доступные команды:\n\n"
         "/start — приветствие и краткое описание возможностей бота.\n"
         "/help — список команд и их описание.\n"
+        "/add_user <username> — вручную добавить пользователя по username в БД (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
-        "/remove_everywhere <user_id> — удалить пользователя из всех известных активных групп "
-        "(только для пользователей из OWNER_USER_IDS)."
+        "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
+        "(только OWNER_USER_IDS)."
     )
     await update.message.reply_text(text)
+
+
+async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /add_user <username>")
+        return
+
+    username = context.args[0].strip().lstrip("@")
+    if not username:
+        await update.message.reply_text("Укажите корректный username.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    user = await service.add_manual_user_by_username(username)
+    await update.message.reply_text(
+        f"Пользователь @{username} добавлен/обновлен в БД. Текущий id: {user.id}."
+    )
 
 
 async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

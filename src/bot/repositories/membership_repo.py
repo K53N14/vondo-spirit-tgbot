@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import Chat, Membership, User
@@ -81,6 +81,26 @@ class MembershipRepository:
         user = await self.session.scalar(stmt)
         if user is None:
             return None
+        return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
+
+    async def add_manual_user_by_username(self, username: str) -> StoredUser:
+        normalized = username.strip().lstrip("@")
+        existing = await self.get_user_by_username(normalized)
+        if existing is not None:
+            return existing
+
+        min_negative_id_stmt = select(func.min(User.id)).where(User.id < 0)
+        min_negative_id = await self.session.scalar(min_negative_id_stmt)
+        next_id = -1 if min_negative_id is None else int(min_negative_id) - 1
+
+        user = User(
+            id=next_id,
+            username=normalized,
+            full_name=f"manual:{normalized}",
+            is_bot=False,
+        )
+        self.session.add(user)
+        await self.session.flush()
         return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
 
     async def list_user_active_chats(self, user_id: int) -> list[StoredUserChat]:

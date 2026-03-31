@@ -8,6 +8,7 @@ from bot.config import load_settings
 from bot.db.models import Base
 from bot.db.session import build_engine, build_session_factory
 from bot.handlers import (
+    add_user_command,
     help_command,
     list_users_command,
     on_chat_member_update,
@@ -54,6 +55,7 @@ def build_application() -> Application:
     app.add_handler(ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("add_user", add_user_command))
     app.add_handler(CommandHandler("users", list_users_command))
     app.add_handler(CommandHandler("user_groups", user_groups_command))
     app.add_handler(CommandHandler("remove_everywhere", remove_everywhere))

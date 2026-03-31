@@ -45,6 +45,13 @@ class MembershipService:
             )
             await session.commit()
 
+    async def add_manual_user_by_username(self, username: str) -> StoredUser:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            user = await repo.add_manual_user_by_username(username)
+            await session.commit()
+            return user
+
     async def list_active_chat_ids(self) -> list[int]:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)
@@ -54,6 +61,11 @@ class MembershipService:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)
             return await repo.list_users()
+
+    async def get_user_by_username(self, username: str) -> Optional[StoredUser]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.get_user_by_username(username)
 
     async def list_user_chats_by_username(self, username: str) -> tuple[Optional[StoredUser], list[StoredUserChat]]:
         async with self.session_factory() as session:
