@@ -1,7 +1,21 @@
+Metadata-Version: 2.4
+Name: group-member-guardian-bot
+Version: 0.1.0
+Summary: PTB bot scaffold for tracking group members and removing users from all groups
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: python-telegram-bot<23.0,>=22.0
+Requires-Dist: SQLAlchemy<3.0,>=2.0
+Requires-Dist: aiosqlite<1.0,>=0.20
+Requires-Dist: python-dotenv<2.0,>=1.0
+Provides-Extra: dev
+Requires-Dist: pytest<9.0,>=8.0; extra == "dev"
+Requires-Dist: ruff<1.0,>=0.5; extra == "dev"
+Requires-Dist: mypy<2.0,>=1.10; extra == "dev"
+
 # Group Member Guardian Bot (Scaffold)
 
 Скелет проекта на `python-telegram-bot` для сценария:
-
 - отслеживать изменения участников в группах;
 - хранить состояние участников в БД;
 - удалять выбранного пользователя из всех известных групп командой `/remove_everywhere <user_id>`.
