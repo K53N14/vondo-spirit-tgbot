@@ -24,6 +24,13 @@ class StoredUserChat:
     status: str
 
 
+@dataclass(frozen=True)
+class StoredChat:
+    chat_id: int
+    title: Optional[str]
+    chat_type: str
+
+
 class MembershipRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -87,6 +94,12 @@ class MembershipRepository:
         stmt: Select[tuple[int]] = select(Chat.id).where(Chat.is_active.is_(True))
         rows = await self.session.execute(stmt)
         return list(rows.scalars().all())
+
+    async def list_active_chats(self) -> list[StoredChat]:
+        stmt: Select[tuple[Chat]] = select(Chat).where(Chat.is_active.is_(True)).order_by(Chat.id.asc())
+        rows = await self.session.scalars(stmt)
+        chats = rows.all()
+        return [StoredChat(chat_id=c.id, title=c.title, chat_type=c.type) for c in chats]
 
     async def list_users(self) -> list[StoredUser]:
         stmt: Select[tuple[User]] = select(User).order_by(User.username.asc().nulls_last(), User.full_name.asc())

@@ -15,6 +15,7 @@ from bot.handlers import (
     on_chat_member_update,
     remove_everywhere,
     start_command,
+    sync_me_command,
     user_groups_command,
 )
 from bot.services import MembershipService
@@ -58,6 +59,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("add_user", add_user_command))
     app.add_handler(CommandHandler("delete_user", delete_user_command))
+    app.add_handler(CommandHandler("sync_me", sync_me_command))
     app.add_handler(CommandHandler("users", list_users_command))
     app.add_handler(CommandHandler("user_groups", user_groups_command))
     app.add_handler(CommandHandler("remove_everywhere", remove_everywhere))

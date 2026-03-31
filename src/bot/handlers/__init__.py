@@ -6,6 +6,7 @@ from bot.handlers.common import (
     help_command,
     list_users_command,
     start_command,
+    sync_me_command,
     user_groups_command,
 )
 
@@ -16,6 +17,7 @@ __all__ = [
     "help_command",
     "add_user_command",
     "delete_user_command",
+    "sync_me_command",
     "list_users_command",
     "user_groups_command",
 ]

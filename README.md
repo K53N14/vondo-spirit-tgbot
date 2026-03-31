@@ -42,5 +42,6 @@ python -m bot.main
 - `/add_user <username>` — вручную добавить пользователя по username в БД (для OWNER_USER_IDS).
 - `/users` — показать всех пользователей, сохраненных в БД (для OWNER_USER_IDS).
 - `/delete_user <username>` — удалить пользователя из базы данных (для OWNER_USER_IDS).
+- `/sync_me` — синхронизировать ваш id/имя и участие в известных группах бота (только если ваш username уже есть в БД).
 - `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
 - `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
