@@ -7,7 +7,7 @@ from telegram.ext import Application, ChatMemberHandler, CommandHandler
 from bot.config import load_settings
 from bot.db.models import Base
 from bot.db.session import build_engine, build_session_factory
-from bot.handlers import on_chat_member_update, remove_everywhere
+from bot.handlers import help_command, on_chat_member_update, remove_everywhere, start_command
 from bot.services import MembershipService
 
 
@@ -45,6 +45,8 @@ def build_application() -> Application:
     app.bot_data["membership_service"] = membership_service
 
     app.add_handler(ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("remove_everywhere", remove_everywhere))
 
     return app
