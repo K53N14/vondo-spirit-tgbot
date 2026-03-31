@@ -1,11 +1,27 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional
 
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import Chat, Membership, User
+
+
+@dataclass(frozen=True)
+class StoredUser:
+    id: int
+    username: Optional[str]
+    full_name: str
+
+
+@dataclass(frozen=True)
+class StoredUserChat:
+    chat_id: int
+    title: Optional[str]
+    chat_type: str
+    status: str
 
 
 class MembershipRepository:
@@ -52,3 +68,30 @@ class MembershipRepository:
         stmt: Select[tuple[int]] = select(Chat.id).where(Chat.is_active.is_(True))
         rows = await self.session.execute(stmt)
         return list(rows.scalars().all())
+
+    async def list_users(self) -> list[StoredUser]:
+        stmt: Select[tuple[User]] = select(User).order_by(User.username.asc().nulls_last(), User.full_name.asc())
+        rows = await self.session.scalars(stmt)
+        users = rows.all()
+        return [StoredUser(id=u.id, username=u.username, full_name=u.full_name) for u in users]
+
+    async def get_user_by_username(self, username: str) -> Optional[StoredUser]:
+        normalized = username.lstrip("@")
+        stmt: Select[tuple[User]] = select(User).where(User.username == normalized)
+        user = await self.session.scalar(stmt)
+        if user is None:
+            return None
+        return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
+
+    async def list_user_active_chats(self, user_id: int) -> list[StoredUserChat]:
+        stmt = (
+            select(Chat.id, Chat.title, Chat.type, Membership.status)
+            .join(Membership, Membership.chat_id == Chat.id)
+            .where(Membership.user_id == user_id, Membership.is_current.is_(True))
+            .order_by(Chat.title.asc().nulls_last(), Chat.id.asc())
+        )
+        rows = await self.session.execute(stmt)
+        return [
+            StoredUserChat(chat_id=chat_id, title=title, chat_type=chat_type, status=status)
+            for chat_id, title, chat_type, status in rows.all()
+        ]
