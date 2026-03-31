@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from telegram import Chat, User
 
-from bot.repositories.membership_repo import MembershipRepository
+from bot.repositories.membership_repo import MembershipRepository, StoredUser, StoredUserChat
 
 
 @dataclass(frozen=True)
@@ -48,3 +49,17 @@ class MembershipService:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)
             return await repo.list_active_chat_ids()
+
+    async def list_users(self) -> list[StoredUser]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.list_users()
+
+    async def list_user_chats_by_username(self, username: str) -> tuple[Optional[StoredUser], list[StoredUserChat]]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            user = await repo.get_user_by_username(username)
+            if user is None:
+                return None, []
+            chats = await repo.list_user_active_chats(user.id)
+            return user, chats
