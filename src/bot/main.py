@@ -14,7 +14,13 @@ from bot.handlers import (
     help_command,
     list_users_command,
     on_chat_member_update,
+<<<<<<< HEAD
     remove_everywhere,
+=======
+    on_my_chat_member_update,
+    remove_everywhere,
+    refresh_groups_command,
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
     remove_group_command,
     start_command,
     sync_me_command,
@@ -57,6 +63,10 @@ def build_application() -> Application:
     app.bot_data["membership_service"] = membership_service
 
     app.add_handler(ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
+<<<<<<< HEAD
+=======
+    app.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("add_users", add_users_command))
@@ -64,6 +74,10 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("sync_me", sync_me_command))
     app.add_handler(CommandHandler("groups", groups_command))
     app.add_handler(CommandHandler("remove_group", remove_group_command))
+<<<<<<< HEAD
+=======
+    app.add_handler(CommandHandler("refresh_groups", refresh_groups_command))
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
     app.add_handler(CommandHandler("users", list_users_command))
     app.add_handler(CommandHandler("user_groups", user_groups_command))
     app.add_handler(CommandHandler("remove_everywhere", remove_everywhere))
@@ -73,7 +87,11 @@ def build_application() -> Application:
 
 def main() -> None:
     application = build_application()
+<<<<<<< HEAD
     application.run_polling(allowed_updates=["chat_member", "message"])
+=======
+    application.run_polling(allowed_updates=["chat_member", "my_chat_member", "message"])
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
 
 
 if __name__ == "__main__":

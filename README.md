@@ -1,6 +1,10 @@
 # Group Member Guardian Bot (Scaffold)
 
 Скелет проекта на `python-telegram-bot` для сценария:
+<<<<<<< HEAD
+
+=======
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
 - отслеживать изменения участников в группах;
 - хранить состояние участников в БД;
 - удалять выбранного пользователя из всех известных групп командой `/remove_everywhere <username>`.
@@ -34,7 +38,10 @@ python -m bot.main
 - Для массового удаления нужны права на ограничение пользователей в группах.
 - В проде рекомендуются Postgres + webhook + миграции (Alembic).
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
 ## Команды
 
 - `/start` — приветствие и краткое описание возможностей.
@@ -45,15 +52,36 @@ python -m bot.main
 - `/sync_me` — синхронизировать ваш id/имя и участие в известных группах бота (только если ваш username уже есть в БД).
 - `/groups` — показать все группы, в которых бот учитывается в базе (для OWNER_USER_IDS).
 - `/remove_group <chat_id>` — убрать группу из списка активных/учитываемых (для OWNER_USER_IDS).
+<<<<<<< HEAD
+- `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
+- `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
+
+=======
+- `/refresh_groups` — перепроверить членство бота в известных группах и обновить активный список (для OWNER_USER_IDS).
 - `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
 - `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
 
 
+
+> Примечание: ID чатов Telegram (особенно supergroup, вида `-100...`) очень большие, поэтому в модели БД используется `BIGINT`.
+
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
 ## PostgreSQL (Docker)
+
+### Файлы и безопасная структура
+
+- `docker-compose.yml` — без секретов, использует переменные `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
+- `docker-compose.override.example.yml` — пример локального/серверного override (публикация порта только на localhost).
+- `.env.example` — только шаблон значений.
+- На сервере создай приватные файлы `.env` и `docker-compose.override.yml` (они не должны попадать в git).
 
 ### Локально/сервер: запуск базы
 
 ```bash
+cp .env.example .env
+cp docker-compose.override.example.yml docker-compose.override.yml
+# отредактируй .env: задай реальные POSTGRES_USER/POSTGRES_PASSWORD
+
 docker compose up -d postgres
 docker compose ps
 docker compose logs -f postgres
@@ -64,17 +92,45 @@ docker compose logs -f postgres
 Используй `DATABASE_URL` в формате:
 
 ```env
-DATABASE_URL=postgresql+asyncpg://bot_user:bot_password@<SERVER_IP_OR_HOST>:5432/group_member_guardian
+DATABASE_URL=postgresql+asyncpg://<POSTGRES_USER>:<POSTGRES_PASSWORD>@<SERVER_IP_OR_HOST>:5432/<POSTGRES_DB>
+```
+
+### Как выбрать логин/пароль
+
+- Логин/пароль **не генерируются автоматически** из `docker-compose.yml`.
+- `POSTGRES_USER` и `POSTGRES_PASSWORD` ты задаешь сам в `.env`.
+- Рекомендуется:
+  - `POSTGRES_USER`: отдельный пользователь приложения, например `bot_app`.
+  - `POSTGRES_PASSWORD`: случайный пароль длиной 24+ символов (буквы разных регистров, цифры, спецсимволы).
+- Для генерации пароля можно использовать:
+
+```bash
+openssl rand -base64 36
 ```
 
 ### Развертывание PostgreSQL на сервере (Docker)
 
 1. Установи Docker и Docker Compose plugin.
-2. Скопируй в папку проекта файл `docker-compose.yml`.
-3. Запусти базу: `docker compose up -d postgres`.
-4. Проверь готовность: `docker compose ps` и `docker compose logs -f postgres`.
-5. Открой порт `5432` в firewall только для доверенных IP (или не публикуй наружу и используй private network/VPN).
-6. В `.env` бота укажи правильный `DATABASE_URL` с адресом сервера.
-7. Запусти бота: `python -m bot.main`.
+2. Скопируй в папку проекта `docker-compose.yml`, `docker-compose.override.example.yml`, `.env.example`.
+3. Создай `.env` и `docker-compose.override.yml` из примеров.
+4. Заполни в `.env` реальные `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` и `DATABASE_URL`.
+5. Запусти базу: `docker compose up -d postgres`.
+6. Проверь готовность: `docker compose ps` и `docker compose logs -f postgres`.
+7. В firewall ограничь доступ к порту 5432 (или оставь только localhost bind).
+8. Запусти бота: `python -m bot.main`.
 
-> Для продакшна обязательно поменяй `POSTGRES_PASSWORD`, сделай бэкапы и ограничь доступ к порту БД.
+> Для продакшна обязательно регулярно делать backup (pg_dump), менять пароль при утечках и не хранить реальные секреты в GitHub.
+<<<<<<< HEAD
+=======
+
+
+## Service deployment (systemd)
+
+Готовые файлы для деплоя:
+- `deploy/systemd/group-member-guardian.service`
+- `scripts/restart.sh`
+- `DEPLOY.md` (пошаговый гайд)
+
+Пути в текущем шаблоне настроены для проекта в `/root/vondo-spirit-tgbot`.
+Если у тебя другой путь — обнови `WorkingDirectory`, `EnvironmentFile`, `ExecStart` в unit-файле и `PROJECT_DIR` в `scripts/restart.sh`.
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4

@@ -89,6 +89,21 @@ class MembershipService:
             repo = MembershipRepository(session)
             return await repo.list_active_chats()
 
+<<<<<<< HEAD
+=======
+    async def list_all_chats(self) -> list[StoredChat]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.list_all_chats()
+
+    async def set_chat_active(self, chat_id: int, is_active: bool) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            changed = await repo.set_chat_active(chat_id, is_active)
+            await session.commit()
+            return changed
+
+>>>>>>> 8a5e6175f2b2ebbed776a29511eb21867e6bb4f4
     async def deactivate_chat(self, chat_id: int) -> bool:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)

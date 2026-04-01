@@ -39,3 +39,6 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Server-local docker override
+docker-compose.override.yml
