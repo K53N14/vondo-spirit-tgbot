@@ -1,7 +1,6 @@
 # Group Member Guardian Bot (Scaffold)
 
 Скелет проекта на `python-telegram-bot` для сценария:
-
 - отслеживать изменения участников в группах;
 - хранить состояние участников в БД;
 - удалять выбранного пользователя из всех известных групп командой `/remove_everywhere <username>`.
@@ -35,6 +34,7 @@ python -m bot.main
 - Для массового удаления нужны права на ограничение пользователей в группах.
 - В проде рекомендуются Postgres + webhook + миграции (Alembic).
 
+
 ## Команды
 
 - `/start` — приветствие и краткое описание возможностей.
@@ -47,6 +47,7 @@ python -m bot.main
 - `/remove_group <chat_id>` — убрать группу из списка активных/учитываемых (для OWNER_USER_IDS).
 - `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
 - `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
+
 
 ## PostgreSQL (Docker)
 
@@ -102,3 +103,14 @@ openssl rand -base64 36
 8. Запусти бота: `python -m bot.main`.
 
 > Для продакшна обязательно регулярно делать backup (pg_dump), менять пароль при утечках и не хранить реальные секреты в GitHub.
+
+
+## Service deployment (systemd)
+
+Готовые файлы для деплоя:
+- `deploy/systemd/group-member-guardian.service`
+- `scripts/restart.sh`
+- `DEPLOY.md` (пошаговый гайд)
+
+Пути в текущем шаблоне настроены для проекта в `/root/vondo-spirit-tgbot`.
+Если у тебя другой путь — обнови `WorkingDirectory`, `EnvironmentFile`, `ExecStart` в unit-файле и `PROJECT_DIR` в `scripts/restart.sh`.
