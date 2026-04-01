@@ -42,6 +42,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
         "/groups — показать все группы, в которых бот сейчас учитывается (только OWNER_USER_IDS).\n"
         "/remove_group <chat_id> — убрать группу из списка учитываемых (только OWNER_USER_IDS).\n"
+        "/refresh_groups — перепроверить членство бота в известных группах и обновить список (только OWNER_USER_IDS).\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
         "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
         "(только OWNER_USER_IDS)."
@@ -245,6 +246,71 @@ async def remove_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     await update.message.reply_text(f"Группа с chat_id={chat_id} убрана из списка активных.")
+
+
+async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+
+    me = await context.bot.get_me()
+
+    if update.effective_chat is not None and update.effective_chat.type in {"group", "supergroup"}:
+        try:
+            current_chat_member = await context.bot.get_chat_member(update.effective_chat.id, me.id)
+            await service.save_user_membership(
+                chat_id=update.effective_chat.id,
+                chat_title=update.effective_chat.title,
+                chat_type=update.effective_chat.type,
+                user_id=me.id,
+                username=me.username,
+                full_name=me.full_name,
+                is_bot=me.is_bot,
+                status=current_chat_member.status,
+            )
+        except Exception:
+            # continue with best-effort refresh of known chats
+            pass
+
+    chats = await service.list_all_chats()
+    if not chats:
+        await update.message.reply_text("В базе пока нет групп для обновления.")
+        return
+
+    active_count = 0
+    inactive_count = 0
+    failed: list[str] = []
+
+    for chat in chats:
+        try:
+            member = await context.bot.get_chat_member(chat.chat_id, me.id)
+            status = member.status
+            is_active = status in {"creator", "administrator", "member", "restricted"}
+            await service.set_chat_active(chat.chat_id, is_active)
+            if is_active:
+                active_count += 1
+            else:
+                inactive_count += 1
+        except Exception as exc:
+            failed.append(f"{chat.chat_id}: {exc}")
+
+    lines = [
+        "Обновление списка групп завершено.",
+        f"Всего проверено: {len(chats)}",
+        f"Активных: {active_count}",
+        f"Неактивных: {inactive_count}",
+    ]
+    if failed:
+        lines.append(f"Ошибок: {len(failed)}")
+        lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
+
+    lines.append("Важно: команда не может обнаружить полностью неизвестные группы без update от Telegram.")
+    await update.message.reply_text("\n".join(lines))
 
 
 async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
