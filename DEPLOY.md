@@ -3,8 +3,8 @@
 ## 1) Clone project
 
 ```bash
-git clone <YOUR_REPO_URL> /opt/vondo-spirit-tgbot
-cd /opt/vondo-spirit-tgbot
+git clone <YOUR_REPO_URL> /root/vondo-spirit-tgbot
+cd /root/vondo-spirit-tgbot
 ```
 
 ## 2) Configure environment
@@ -64,12 +64,12 @@ journalctl -u group-member-guardian -f
 ## 8) Rollback (example)
 
 ```bash
-cd /opt/vondo-spirit-tgbot
+cd /root/vondo-spirit-tgbot
 git checkout <PREVIOUS_COMMIT>
 ./scripts/restart.sh
 ```
 
 ## Notes
-- Service defaults to user/group `ubuntu` in `deploy/systemd/group-member-guardian.service` — adjust if needed.
+- Service defaults to user/group `root` in `deploy/systemd/group-member-guardian.service` — adjust if needed.
 - Keep `.env` private and never commit real secrets.
 - Restrict DB network exposure (prefer localhost bind or private network).

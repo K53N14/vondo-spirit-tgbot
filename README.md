@@ -111,3 +111,6 @@ openssl rand -base64 36
 - `deploy/systemd/group-member-guardian.service`
 - `scripts/restart.sh`
 - `DEPLOY.md` (пошаговый гайд)
+
+Пути в текущем шаблоне настроены для проекта в `/root/vondo-spirit-tgbot`.
+Если у тебя другой путь — обнови `WorkingDirectory`, `EnvironmentFile`, `ExecStart` в unit-файле и `PROJECT_DIR` в `scripts/restart.sh`.

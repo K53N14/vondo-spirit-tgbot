@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SERVICE_NAME="group-member-guardian"
-PROJECT_DIR="/opt/vondo-spirit-tgbot"
+PROJECT_DIR="/root/vondo-spirit-tgbot"
 
 cd "$PROJECT_DIR"
 

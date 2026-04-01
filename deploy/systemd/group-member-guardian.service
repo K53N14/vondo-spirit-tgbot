@@ -6,12 +6,12 @@ Wants=network-online.target
 [Service]
 Type=simple
 # Change these to your deployment user/group
-User=ubuntu
-Group=ubuntu
+User=root
+Group=root
 
-WorkingDirectory=/opt/vondo-spirit-tgbot
-EnvironmentFile=/opt/vondo-spirit-tgbot/.env
-ExecStart=/opt/vondo-spirit-tgbot/.venv/bin/python -m bot.main
+WorkingDirectory=/root/vondo-spirit-tgbot
+EnvironmentFile=/root/vondo-spirit-tgbot/.env
+ExecStart=/root/vondo-spirit-tgbot/.venv/bin/python -m bot.main
 
 Restart=always
 RestartSec=5
