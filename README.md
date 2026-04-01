@@ -47,3 +47,34 @@ python -m bot.main
 - `/remove_group <chat_id>` — убрать группу из списка активных/учитываемых (для OWNER_USER_IDS).
 - `/user_groups <username>` — показать, в каких группах состоит пользователь по логину (для OWNER_USER_IDS).
 - `/remove_everywhere <username>` — удалить пользователя из всех известных активных групп по username (для OWNER_USER_IDS).
+
+
+## PostgreSQL (Docker)
+
+### Локально/сервер: запуск базы
+
+```bash
+docker compose up -d postgres
+docker compose ps
+docker compose logs -f postgres
+```
+
+### Строка подключения для бота
+
+Используй `DATABASE_URL` в формате:
+
+```env
+DATABASE_URL=postgresql+asyncpg://bot_user:bot_password@<SERVER_IP_OR_HOST>:5432/group_member_guardian
+```
+
+### Развертывание PostgreSQL на сервере (Docker)
+
+1. Установи Docker и Docker Compose plugin.
+2. Скопируй в папку проекта файл `docker-compose.yml`.
+3. Запусти базу: `docker compose up -d postgres`.
+4. Проверь готовность: `docker compose ps` и `docker compose logs -f postgres`.
+5. Открой порт `5432` в firewall только для доверенных IP (или не публикуй наружу и используй private network/VPN).
+6. В `.env` бота укажи правильный `DATABASE_URL` с адресом сервера.
+7. Запусти бота: `python -m bot.main`.
+
+> Для продакшна обязательно поменяй `POSTGRES_PASSWORD`, сделай бэкапы и ограничь доступ к порту БД.

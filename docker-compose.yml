@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: group-member-guardian-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: group_member_guardian
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: bot_password
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot_user -d group_member_guardian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:
