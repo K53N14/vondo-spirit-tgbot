@@ -1,7 +1,7 @@
 from bot.handlers.admin import remove_everywhere
 from bot.handlers.chat_member import on_chat_member_update
 from bot.handlers.common import (
-    add_user_command,
+    add_users_command,
     delete_user_command,
     groups_command,
     help_command,
@@ -17,7 +17,7 @@ __all__ = [
     "remove_everywhere",
     "start_command",
     "help_command",
-    "add_user_command",
+    "add_users_command",
     "delete_user_command",
     "sync_me_command",
     "groups_command",

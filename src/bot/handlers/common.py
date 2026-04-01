@@ -36,7 +36,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Доступные команды:\n\n"
         "/start — приветствие и краткое описание возможностей бота.\n"
         "/help — список команд и их описание.\n"
-        "/add_user <username> — вручную добавить пользователя по username в БД (только OWNER_USER_IDS).\n"
+        "/add_users <username ...> — вручную добавить одного или нескольких пользователей по username в БД (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
@@ -49,7 +49,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(text)
 
 
-async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def add_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
 
@@ -58,19 +58,33 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if not context.args:
-        await update.message.reply_text("Использование: /add_user <username>")
+        await update.message.reply_text("Использование: /add_users <username1> [username2] ...")
         return
 
-    username = context.args[0].strip().lstrip("@")
-    if not username:
-        await update.message.reply_text("Укажите корректный username.")
+    raw_usernames: list[str] = []
+    for arg in context.args:
+        parts = [p.strip() for p in arg.split(",") if p.strip()]
+        raw_usernames.extend(parts)
+
+    usernames: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_usernames:
+        username = raw.lstrip("@").strip()
+        if username and username not in seen:
+            seen.add(username)
+            usernames.append(username)
+
+    if not usernames:
+        await update.message.reply_text("Укажите хотя бы один корректный username.")
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
-    user = await service.add_manual_user_by_username(username)
-    await update.message.reply_text(
-        f"Пользователь @{username} добавлен/обновлен в БД. Текущий id: {user.id}."
-    )
+    added: list[str] = []
+    for username in usernames:
+        user = await service.add_manual_user_by_username(username)
+        added.append(f"@{username} (id={user.id})")
+
+    await update.message.reply_text("Добавлены/обновлены пользователи:\n" + "\n".join(f"- {item}" for item in added))
 
 
 async def delete_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -111,7 +125,7 @@ async def sync_me_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     service: MembershipService = context.application.bot_data["membership_service"]
     existing_user = await service.get_user_by_username(username)
     if existing_user is None:
-        await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_user <username>.")
+        await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_users <username ...>.")
         return
 
     await service.upsert_user_profile(
