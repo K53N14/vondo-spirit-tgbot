@@ -1,0 +1,7 @@
+version: "3.9"
+
+services:
+  postgres:
+    # Publish only on localhost for safer server setup.
+    ports:
+      - "127.0.0.1:5432:5432"
