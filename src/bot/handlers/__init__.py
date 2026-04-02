@@ -6,6 +6,7 @@ from bot.handlers.common import (
     groups_command,
     help_command,
     list_users_command,
+    sync_everyone_command,
     refresh_groups_command,
     remove_group_command,
     start_command,
