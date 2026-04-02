@@ -40,8 +40,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
+        "/sync_everyone — синхронизировать всех пользователей БД по известным группам (только OWNER_USER_IDS).\n"
         "/groups — показать все группы, в которых бот сейчас учитывается (только OWNER_USER_IDS).\n"
         "/remove_group <chat_id> — убрать группу из списка учитываемых (только OWNER_USER_IDS).\n"
+        "/refresh_groups — перепроверить членство бота в известных группах и обновить список (только OWNER_USER_IDS).\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
         "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
         "(только OWNER_USER_IDS)."
@@ -198,6 +200,68 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("\n".join(lines))
 
 
+async def sync_everyone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    users = await service.list_users()
+    chats = await service.list_active_chats()
+
+    if not users:
+        await update.message.reply_text("В базе нет пользователей для синхронизации.")
+        return
+
+    if not chats:
+        await update.message.reply_text("В базе нет активных групп для синхронизации.")
+        return
+
+    processed_users = 0
+    synced_statuses = 0
+    skipped_users = 0
+    failed: list[str] = []
+
+    for user in users:
+        if user.id <= 0:
+            skipped_users += 1
+            continue
+
+        processed_users += 1
+        for chat in chats:
+            try:
+                member = await context.bot.get_chat_member(chat.chat_id, user.id)
+                await service.save_user_membership(
+                    chat_id=chat.chat_id,
+                    chat_title=chat.title,
+                    chat_type=chat.chat_type,
+                    user_id=user.id,
+                    username=user.username,
+                    full_name=user.full_name,
+                    is_bot=False,
+                    status=member.status,
+                )
+                synced_statuses += 1
+            except Exception as exc:
+                failed.append(f"user={user.id}, chat={chat.chat_id}: {exc}")
+
+    lines = [
+        "Синхронизация всех пользователей завершена.",
+        f"Пользователей в БД: {len(users)}",
+        f"Обработано пользователей: {processed_users}",
+        f"Пропущено (без реального user_id): {skipped_users}",
+        f"Записано статусов: {synced_statuses}",
+    ]
+    if failed:
+        lines.append(f"Ошибок: {len(failed)}")
+        lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
+
+    await update.message.reply_text("\n".join(lines))
+
+
 async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
@@ -245,6 +309,71 @@ async def remove_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     await update.message.reply_text(f"Группа с chat_id={chat_id} убрана из списка активных.")
+
+
+async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+
+    me = await context.bot.get_me()
+
+    if update.effective_chat is not None and update.effective_chat.type in {"group", "supergroup"}:
+        try:
+            current_chat_member = await context.bot.get_chat_member(update.effective_chat.id, me.id)
+            await service.save_user_membership(
+                chat_id=update.effective_chat.id,
+                chat_title=update.effective_chat.title,
+                chat_type=update.effective_chat.type,
+                user_id=me.id,
+                username=me.username,
+                full_name=me.full_name,
+                is_bot=me.is_bot,
+                status=current_chat_member.status,
+            )
+        except Exception:
+            # continue with best-effort refresh of known chats
+            pass
+
+    chats = await service.list_all_chats()
+    if not chats:
+        await update.message.reply_text("В базе пока нет групп для обновления.")
+        return
+
+    active_count = 0
+    inactive_count = 0
+    failed: list[str] = []
+
+    for chat in chats:
+        try:
+            member = await context.bot.get_chat_member(chat.chat_id, me.id)
+            status = member.status
+            is_active = status in {"creator", "administrator", "member", "restricted"}
+            await service.set_chat_active(chat.chat_id, is_active)
+            if is_active:
+                active_count += 1
+            else:
+                inactive_count += 1
+        except Exception as exc:
+            failed.append(f"{chat.chat_id}: {exc}")
+
+    lines = [
+        "Обновление списка групп завершено.",
+        f"Всего проверено: {len(chats)}",
+        f"Активных: {active_count}",
+        f"Неактивных: {inactive_count}",
+    ]
+    if failed:
+        lines.append(f"Ошибок: {len(failed)}")
+        lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
+
+    lines.append("Важно: команда не может обнаружить полностью неизвестные группы без update от Telegram.")
+    await update.message.reply_text("\n".join(lines))
 
 
 async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
