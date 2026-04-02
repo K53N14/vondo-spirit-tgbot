@@ -226,49 +226,19 @@ async def sync_everyone_command(update: Update, context: ContextTypes.DEFAULT_TY
     failed: list[str] = []
 
     for user in users:
-        # if user.id <= 0:
-        #     skipped_users += 1
-        #     continue
-        effective_id = user.id
-
-        # 1. Обрабатываем пользователей с неизвестным/техническим ID (например, -1)
-        if effective_id <= 0:
-            if not user.username:
-                failed.append(f"user={user.full_name or 'N/A'}: отсутствует username, невозможно узнать ID")
-                skipped_users += 1
-                continue
-
-            try:
-                # 2. Запрашиваем реальный ID через Telegram API по username
-                # Метод get_chat принимает username с @ или без
-                chat_obj = await context.bot.get_chat(user.username)
-                effective_id = chat_obj.id
-                effective_full_name = chat_obj.full_name
-                resolved_users += 1
-
-                # 💡 РЕКОМЕНДАЦИЯ: Если ваш сервис поддерживает обновление записи,
-                # имеет смысл сохранить найденный ID в БД, чтобы в будущем не запрашивать его снова:
-                # await service.update_user_id(user.id, effective_id)
-                await service.upsert_user_profile(
-                    user_id=effective_id,
-                    full_name=effective_full_name,
-                    is_bot=user.is_bot,
-                )
-            except Exception as exc:
-                # 3. Обрабатываем ошибки: неверный username, ограничение доступа, rate-limit и т.д.
-                failed.append(f"user={user.username}: ошибка получения ID ({exc})")
-                skipped_users += 1
-                continue
+        if user.id <= 0:
+            skipped_users += 1
+            continue
 
         processed_users += 1
         for chat in chats:
             try:
-                member = await context.bot.get_chat_member(chat.chat_id, effective_id)
+                member = await context.bot.get_chat_member(chat.chat_id, user.id)
                 await service.save_user_membership(
                     chat_id=chat.chat_id,
                     chat_title=chat.title,
                     chat_type=chat.chat_type,
-                    user_id=effective_id,
+                    user_id=user.id,
                     username=user.username,
                     full_name=user.full_name,
                     is_bot=False,
@@ -276,7 +246,7 @@ async def sync_everyone_command(update: Update, context: ContextTypes.DEFAULT_TY
                 )
                 synced_statuses += 1
             except Exception as exc:
-                failed.append(f"user={effective_id}, chat={chat.chat_id}: {exc}")
+                failed.append(f"user={user.id}, chat={chat.chat_id}: {exc}")
 
     lines = [
         "Синхронизация всех пользователей завершена.",
