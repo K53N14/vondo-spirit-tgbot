@@ -110,6 +110,27 @@ openssl rand -base64 36
 > Для продакшна обязательно регулярно делать backup (pg_dump), менять пароль при утечках и не хранить реальные секреты в GitHub.
 
 
+
+## Railway
+
+В репозитории есть готовый `railway.json` без необходимости руками задавать Start Command в UI.
+
+Что важно для Railway:
+- зависимости ставятся из `requirements.txt` (через `nixpacks.toml`, без `pip install .`);
+- бот стартует командой `PYTHONPATH=src python -m bot.main`;
+- обязательно задай переменные окружения: `BOT_TOKEN`, `DATABASE_URL`, `OWNER_USER_IDS`.
+
+Самый короткий рабочий сценарий:
+1. Создай сервис из этого репозитория (Railway автоматически подхватит `railway.json` + `nixpacks.toml`).
+2. Добавь PostgreSQL plugin в том же Railway-проекте.
+3. В Variables сервиса бота задай:
+   - `BOT_TOKEN=<токен_бота>`
+   - `OWNER_USER_IDS=<id1,id2>`
+   - `DATABASE_URL=postgresql+asyncpg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}?ssl=require`
+4. Нажми Deploy.
+
+Если Railway подставляет URL с `target_session_attrs=read-write`, код бота теперь автоматически убирает этот параметр на старте.
+
 ## Service deployment (systemd)
 
 Готовые файлы для деплоя:
