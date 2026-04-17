@@ -1,0 +1,9 @@
+python-telegram-bot<23.0,>=22.0
+SQLAlchemy<3.0,>=2.0
+aiosqlite<1.0,>=0.20
+python-dotenv<2.0,>=1.0
+
+[dev]
+pytest<9.0,>=8.0
+ruff<1.0,>=0.5
+mypy<2.0,>=1.10
