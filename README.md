@@ -110,16 +110,6 @@ openssl rand -base64 36
 > Для продакшна обязательно регулярно делать backup (pg_dump), менять пароль при утечках и не хранить реальные секреты в GitHub.
 
 
-
-## Railway
-
-В репозитории есть готовый `railway.json` без необходимости руками задавать Start Command в UI.
-
-Что важно для Railway:
-- зависимости ставятся из `requirements.txt` (через `nixpacks.toml`, без `pip install .`);
-- бот стартует командой `PYTHONPATH=src python -m bot.main`;
-- обязательно задай переменные окружения: `BOT_TOKEN`, `DATABASE_URL`, `OWNER_USER_IDS`.
-
 ## Service deployment (systemd)
 
 Готовые файлы для деплоя:
