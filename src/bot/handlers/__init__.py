@@ -11,13 +11,14 @@ from bot.handlers.common import (
     groups_command,
     help_command,
     list_users_command,
-    sync_everyone_command,
     refresh_groups_command,
     remove_group_command,
     start_command,
+    sync_everyone_command,
     sync_me_command,
     user_groups_command,
 )
+from bot.handlers.ui import on_menu_text
 
 __all__ = [
     "on_chat_member_update",
@@ -26,6 +27,7 @@ __all__ = [
     "promote_admin_command",
     "set_admin_rank_command",
     "set_admin_rights_command",
+    "on_menu_text",
     "start_command",
     "help_command",
     "add_users_command",

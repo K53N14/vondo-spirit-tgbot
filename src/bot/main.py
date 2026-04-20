@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from telegram.ext import Application, ChatMemberHandler, CommandHandler
+from telegram.ext import Application, ChatMemberHandler, CommandHandler, MessageHandler, filters
 
 from bot.config import load_settings
 from bot.db.models import Base
@@ -15,6 +15,7 @@ from bot.handlers import (
     list_users_command,
     on_chat_member_update,
     on_my_chat_member_update,
+    on_menu_text,
     promote_admin_command,
     remove_everywhere,
     set_admin_rank_command,
@@ -79,6 +80,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("promote_admin", promote_admin_command))
     app.add_handler(CommandHandler("set_admin_rank", set_admin_rank_command))
     app.add_handler(CommandHandler("set_admin_rights", set_admin_rights_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_menu_text))
 
     return app
 
