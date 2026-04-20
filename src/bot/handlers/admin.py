@@ -82,6 +82,11 @@ def _parse_rights_assignments(tokens: list[str]) -> tuple[dict[str, bool] | None
     return rights, None
 
 
+async def _get_user_chat_ids(service: MembershipService, username: str) -> list[int]:
+    _, chats = await service.list_user_chats_by_username(username)
+    return [chat.chat_id for chat in chats]
+
+
 async def remove_everywhere(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user is None or update.message is None:
         return
@@ -112,7 +117,12 @@ async def remove_everywhere(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    chat_ids = await service.list_active_chat_ids()
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Нечего удалять."
+        )
+        return
 
     success: list[int] = []
     failed: list[tuple[int, str]] = []
@@ -150,13 +160,19 @@ async def promote_admin_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
-    active_chat_ids = await service.list_active_chat_ids()
-    target_chat_ids, error = _parse_target_chat_ids(context.args[0], active_chat_ids)
+    username = context.args[1].strip().lstrip("@")
+    user_chat_ids = await _get_user_chat_ids(service, username)
+    if not user_chat_ids:
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется."
+        )
+        return
+
+    target_chat_ids, error = _parse_target_chat_ids(context.args[0], user_chat_ids)
     if error:
         await update.message.reply_text(error)
         return
 
-    username = context.args[1].strip().lstrip("@")
     target_user = await service.get_user_by_username(username)
     if target_user is None:
         await update.message.reply_text(f"Пользователь @{username} не найден в базе.")
@@ -198,13 +214,19 @@ async def set_admin_rank_command(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
-    active_chat_ids = await service.list_active_chat_ids()
-    target_chat_ids, error = _parse_target_chat_ids(context.args[0], active_chat_ids)
+    username = context.args[1].strip().lstrip("@")
+    user_chat_ids = await _get_user_chat_ids(service, username)
+    if not user_chat_ids:
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется."
+        )
+        return
+
+    target_chat_ids, error = _parse_target_chat_ids(context.args[0], user_chat_ids)
     if error:
         await update.message.reply_text(error)
         return
 
-    username = context.args[1].strip().lstrip("@")
     rank = " ".join(context.args[2:]).strip()
     if not rank:
         await update.message.reply_text("Укажите непустой rank.")
@@ -257,13 +279,19 @@ async def set_admin_rights_command(update: Update, context: ContextTypes.DEFAULT
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
-    active_chat_ids = await service.list_active_chat_ids()
-    target_chat_ids, error = _parse_target_chat_ids(context.args[0], active_chat_ids)
+    username = context.args[1].strip().lstrip("@")
+    user_chat_ids = await _get_user_chat_ids(service, username)
+    if not user_chat_ids:
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется."
+        )
+        return
+
+    target_chat_ids, error = _parse_target_chat_ids(context.args[0], user_chat_ids)
     if error:
         await update.message.reply_text(error)
         return
 
-    username = context.args[1].strip().lstrip("@")
     target_user = await service.get_user_by_username(username)
     if target_user is None:
         await update.message.reply_text(f"Пользователь @{username} не найден в базе.")

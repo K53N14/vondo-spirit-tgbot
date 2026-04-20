@@ -170,7 +170,7 @@ class MembershipRepository:
         stmt = (
             select(Chat.id, Chat.title, Chat.type, Membership.status)
             .join(Membership, Membership.chat_id == Chat.id)
-            .where(Membership.user_id == user_id, Membership.is_current.is_(True))
+            .where(Membership.user_id == user_id, Membership.is_current.is_(True), Chat.is_active.is_(True))
             .order_by(Chat.title.asc().nulls_last(), Chat.id.asc())
         )
         rows = await self.session.execute(stmt)

@@ -137,6 +137,11 @@ def _parse_rights_assignments(tokens: list[str]) -> tuple[dict[str, bool] | None
     return rights, None
 
 
+async def _get_user_chat_ids(service: MembershipService, username: str) -> list[int]:
+    _, chats = await service.list_user_chats_by_username(username)
+    return [chat.chat_id for chat in chats]
+
+
 async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if query is None or update.effective_user is None:
@@ -315,7 +320,14 @@ async def _process_remove_everywhere(
         )
         return
 
-    chat_ids = await service.list_active_chat_ids()
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Нечего удалять.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
     success = 0
     failed: list[str] = []
 
@@ -354,7 +366,14 @@ async def _process_promote_admin(
         )
         return
 
-    chat_ids = await service.list_active_chat_ids()
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
     success = 0
     failed: list[str] = []
 
@@ -413,7 +432,14 @@ async def _process_set_rank(
         await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
         return
 
-    chat_ids = await service.list_active_chat_ids()
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
     success = 0
     failed: list[str] = []
 
@@ -473,7 +499,14 @@ async def _process_set_rights(
         await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
         return
 
-    chat_ids = await service.list_active_chat_ids()
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
     success = 0
     failed: list[str] = []
 
