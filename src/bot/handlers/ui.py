@@ -15,12 +15,17 @@ CB_ADMIN_USERS = "admin_users"
 CB_ADMIN_GROUPS = "admin_groups"
 CB_ACT_REMOVE = "act_remove_everywhere"
 CB_ACT_PROMOTE = "act_promote_admin"
+CB_ACT_DEMOTE = "act_demote_admin"
 CB_ACT_RANK = "act_set_rank"
 CB_ACT_RIGHTS = "act_set_rights"
 CB_CANCEL = "act_cancel"
 
+CB_RIGHTS_TOGGLE_PREFIX = "rights_toggle:"
+CB_RIGHTS_APPLY = "rights_apply"
+
 ACTION_REMOVE = "remove_everywhere"
 ACTION_PROMOTE = "promote_admin"
+ACTION_DEMOTE = "demote_admin"
 ACTION_SET_RANK = "set_rank"
 ACTION_SET_RIGHTS = "set_rights"
 
@@ -83,9 +88,10 @@ def build_admin_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⬆️ Назначить админом", callback_data=CB_ACT_PROMOTE),
         ],
         [
+            InlineKeyboardButton("⏬ Демоутить админа", callback_data=CB_ACT_DEMOTE),
             InlineKeyboardButton("🏷 Установить rank", callback_data=CB_ACT_RANK),
-            InlineKeyboardButton("🔐 Изменить права", callback_data=CB_ACT_RIGHTS),
         ],
+        [InlineKeyboardButton("🔐 Изменить права (чекбоксы)", callback_data=CB_ACT_RIGHTS)],
         [InlineKeyboardButton("↩️ В главное меню", callback_data=CB_BACK_MAIN)],
     ]
     return InlineKeyboardMarkup(rows)
@@ -100,41 +106,28 @@ def build_cancel_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def build_rights_keyboard(selected: dict[str, bool]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for right in sorted(ALLOWED_ADMIN_RIGHTS):
+        mark = "✅" if selected.get(right, False) else "⬜"
+        rows.append([InlineKeyboardButton(f"{mark} {right}", callback_data=f"{CB_RIGHTS_TOGGLE_PREFIX}{right}")])
+
+    rows.append([InlineKeyboardButton("💾 Применить выбранные права", callback_data=CB_RIGHTS_APPLY)])
+    rows.append([InlineKeyboardButton("❎ Отменить действие", callback_data=CB_CANCEL)])
+    rows.append([InlineKeyboardButton("↩️ В главное меню", callback_data=CB_BACK_MAIN)])
+    return InlineKeyboardMarkup(rows)
+
+
 def _clear_pending_action(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop("pending_action", None)
     context.user_data.pop("pending_stage", None)
     context.user_data.pop("pending_username", None)
+    context.user_data.pop("pending_rights", None)
 
 
 def _set_pending_action(context: ContextTypes.DEFAULT_TYPE, *, action: str, stage: str = "input") -> None:
     context.user_data["pending_action"] = action
     context.user_data["pending_stage"] = stage
-
-
-def _parse_rights_assignments(tokens: list[str]) -> tuple[dict[str, bool] | None, str | None]:
-    rights: dict[str, bool] = {}
-    for token in tokens:
-        if "=" not in token:
-            return None, f"Некорректный формат '{token}'. Используй right=true|false."
-
-        key, raw_value = token.split("=", 1)
-        key = key.strip().lower()
-        value = raw_value.strip().lower()
-
-        if key not in ALLOWED_ADMIN_RIGHTS:
-            return None, f"Неизвестное право: {key}."
-
-        if value in {"1", "true", "yes", "on"}:
-            rights[key] = True
-        elif value in {"0", "false", "no", "off"}:
-            rights[key] = False
-        else:
-            return None, f"Некорректное значение для {key}: {raw_value}."
-
-    if not rights:
-        return None, "Укажи хотя бы одно право для изменения."
-
-    return rights, None
 
 
 async def _get_user_chat_ids(service: MembershipService, username: str) -> list[int]:
@@ -152,6 +145,14 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     service: MembershipService = context.application.bot_data["membership_service"]
     is_owner = _is_owner(update, context)
     data = query.data or ""
+
+    if data.startswith(CB_RIGHTS_TOGGLE_PREFIX):
+        await _handle_rights_toggle(update, context, data)
+        return
+
+    if data == CB_RIGHTS_APPLY:
+        await _apply_selected_rights(update, context, service)
+        return
 
     if data == CB_CANCEL:
         _clear_pending_action(context)
@@ -249,6 +250,14 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
 
+    if data == CB_ACT_DEMOTE:
+        _set_pending_action(context, action=ACTION_DEMOTE)
+        await query.message.reply_text(
+            "Введи username администратора, которого нужно демоутить во всех его группах:\nПример: @alice",
+            reply_markup=build_cancel_keyboard(),
+        )
+        return
+
     if data == CB_ACT_RANK:
         _set_pending_action(context, action=ACTION_SET_RANK, stage="username")
         await query.message.reply_text(
@@ -293,6 +302,10 @@ async def on_action_input(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _process_promote_admin(update, context, service, text)
         return
 
+    if action == ACTION_DEMOTE:
+        await _process_demote_admin(update, context, service, text)
+        return
+
     if action == ACTION_SET_RANK:
         await _process_set_rank(update, context, service, text)
         return
@@ -328,6 +341,7 @@ async def _process_remove_everywhere(
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
+
     success = 0
     failed: list[str] = []
 
@@ -374,6 +388,7 @@ async def _process_promote_admin(
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
+
     success = 0
     failed: list[str] = []
 
@@ -386,6 +401,53 @@ async def _process_promote_admin(
 
     _clear_pending_action(context)
     lines = [f"Назначение @{username} администратором завершено.", f"Успешно: {success}", f"Ошибок: {len(failed)}"]
+    if failed:
+        lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
+
+    await update.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
+
+
+async def _process_demote_admin(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    service: MembershipService,
+    raw_username: str,
+) -> None:
+    username = raw_username.lstrip("@").strip()
+    target_user = await service.get_user_by_username(username)
+    if target_user is None:
+        await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
+        return
+
+    if target_user.id <= 0:
+        await update.message.reply_text(
+            "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+            reply_markup=build_cancel_keyboard(),
+        )
+        return
+
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await update.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
+
+    demote_rights = {right: False for right in ALLOWED_ADMIN_RIGHTS}
+    success = 0
+    failed: list[str] = []
+
+    for chat_id in chat_ids:
+        try:
+            await context.bot.promote_chat_member(chat_id=chat_id, user_id=target_user.id, **demote_rights)
+            success += 1
+        except Exception as exc:
+            failed.append(f"{chat_id}: {exc}")
+
+    _clear_pending_action(context)
+    lines = [f"Демоут @{username} завершен.", f"Успешно: {success}", f"Ошибок: {len(failed)}"]
     if failed:
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
 
@@ -440,6 +502,7 @@ async def _process_set_rank(
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
+
     success = 0
     failed: list[str] = []
 
@@ -466,37 +529,20 @@ async def _process_set_rights(
 ) -> None:
     stage = context.user_data.get("pending_stage", "username")
 
-    if stage == "username":
-        username = user_input.lstrip("@").strip()
-        target_user = await service.get_user_by_username(username)
-        if target_user is None:
-            await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
-            return
-        if target_user.id <= 0:
-            await update.message.reply_text(
-                "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
-                reply_markup=build_cancel_keyboard(),
-            )
-            return
+    if stage != "username":
+        await update.message.reply_text("Используй кнопки выбора прав или отмени действие.", reply_markup=build_cancel_keyboard())
+        return
 
-        context.user_data["pending_username"] = username
-        context.user_data["pending_stage"] = "rights"
+    username = user_input.lstrip("@").strip()
+    target_user = await service.get_user_by_username(username)
+    if target_user is None:
+        await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
+        return
+    if target_user.id <= 0:
         await update.message.reply_text(
-            "Введите права в формате right=true|false через пробел.\n"
-            "Пример: can_delete_messages=true can_invite_users=false",
+            "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
             reply_markup=build_cancel_keyboard(),
         )
-        return
-
-    username = str(context.user_data.get("pending_username", "")).strip()
-    rights, parse_error = _parse_rights_assignments(user_input.split())
-    if parse_error or rights is None:
-        await update.message.reply_text(parse_error or "Не удалось разобрать права.", reply_markup=build_cancel_keyboard())
-        return
-
-    target_user = await service.get_user_by_username(username)
-    if target_user is None or target_user.id <= 0:
-        await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
         return
 
     chat_ids = await _get_user_chat_ids(service, username)
@@ -507,25 +553,97 @@ async def _process_set_rights(
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
+
+    context.user_data["pending_username"] = username
+    context.user_data["pending_stage"] = "rights_select"
+    context.user_data["pending_rights"] = {right: False for right in ALLOWED_ADMIN_RIGHTS}
+
+    await update.message.reply_text(
+        f"Выбери права для @{username}. ✅ — право будет выдано, ⬜ — право будет снято.",
+        reply_markup=build_rights_keyboard(context.user_data["pending_rights"]),
+    )
+
+
+async def _handle_rights_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
+    if context.user_data.get("pending_action") != ACTION_SET_RIGHTS or context.user_data.get("pending_stage") != "rights_select":
+        await query.message.reply_text("Нет активного сценария изменения прав. Запусти его из админ-панели.")
+        return
+
+    right = data.replace(CB_RIGHTS_TOGGLE_PREFIX, "", 1)
+    if right not in ALLOWED_ADMIN_RIGHTS:
+        return
+
+    selected = context.user_data.get("pending_rights")
+    if not isinstance(selected, dict):
+        selected = {r: False for r in ALLOWED_ADMIN_RIGHTS}
+
+    selected[right] = not bool(selected.get(right, False))
+    context.user_data["pending_rights"] = selected
+
+    await query.edit_message_reply_markup(reply_markup=build_rights_keyboard(selected))
+
+
+async def _apply_selected_rights(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    service: MembershipService,
+) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
+    if context.user_data.get("pending_action") != ACTION_SET_RIGHTS or context.user_data.get("pending_stage") != "rights_select":
+        await query.message.reply_text("Нет активного сценария изменения прав. Запусти его из админ-панели.")
+        return
+
+    username = str(context.user_data.get("pending_username", "")).strip()
+    selected = context.user_data.get("pending_rights")
+    if not username or not isinstance(selected, dict):
+        await query.message.reply_text("Не удалось применить права: потеряно состояние сценария.")
+        _clear_pending_action(context)
+        return
+
+    target_user = await service.get_user_by_username(username)
+    if target_user is None or target_user.id <= 0:
+        await query.message.reply_text("Пользователь больше недоступен в БД.")
+        _clear_pending_action(context)
+        return
+
+    chat_ids = await _get_user_chat_ids(service, username)
+    if not chat_ids:
+        _clear_pending_action(context)
+        await query.message.reply_text(
+            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            reply_markup=build_main_keyboard(_is_owner(update, context)),
+        )
+        return
+
+    rights_payload = {right: bool(selected.get(right, False)) for right in ALLOWED_ADMIN_RIGHTS}
     success = 0
     failed: list[str] = []
 
     for chat_id in chat_ids:
         try:
-            await context.bot.promote_chat_member(chat_id=chat_id, user_id=target_user.id, **rights)
+            await context.bot.promote_chat_member(chat_id=chat_id, user_id=target_user.id, **rights_payload)
             success += 1
         except Exception as exc:
             failed.append(f"{chat_id}: {exc}")
 
     _clear_pending_action(context)
-    rights_preview = ", ".join(f"{k}={v}" for k, v in rights.items())
+    enabled = [right for right, value in rights_payload.items() if value]
+    enabled_text = ", ".join(sorted(enabled)) if enabled else "(все права сняты)"
+
     lines = [
         f"Права для @{username} обновлены.",
-        f"Права: {rights_preview}",
+        f"Выбраны права: {enabled_text}",
         f"Успешно: {success}",
         f"Ошибок: {len(failed)}",
     ]
     if failed:
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
 
-    await update.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
+    await query.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
