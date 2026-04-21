@@ -18,7 +18,7 @@ from bot.handlers.common import (
     sync_me_command,
     user_groups_command,
 )
-from bot.handlers.ui import on_action_input, on_inline_button
+from bot.handlers.ui import on_action_input, on_inline_button, on_left_chat_member_cleanup
 
 __all__ = [
     "on_chat_member_update",
@@ -29,6 +29,7 @@ __all__ = [
     "set_admin_rights_command",
     "on_inline_button",
     "on_action_input",
+    "on_left_chat_member_cleanup",
     "start_command",
     "help_command",
     "add_users_command",

@@ -17,6 +17,7 @@ from bot.handlers import (
     on_my_chat_member_update,
     on_action_input,
     on_inline_button,
+    on_left_chat_member_cleanup,
     promote_admin_command,
     remove_everywhere,
     set_admin_rank_command,
@@ -82,6 +83,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("set_admin_rank", set_admin_rank_command))
     app.add_handler(CommandHandler("set_admin_rights", set_admin_rights_command))
     app.add_handler(CallbackQueryHandler(on_inline_button))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_chat_member_cleanup))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_action_input))
 
     return app

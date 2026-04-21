@@ -19,11 +19,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     text = (
-        "Привет! Я бот для контроля участников в группах.\n\n"
+        "Привет! Я бот для контроля участников в группах и каналах.\n\n"
         "Что я умею:\n"
         "• отслеживать изменения участников через chat_member обновления;\n"
         "• хранить состояние участников в базе;\n"
-        "• удалять пользователя из всех известных групп командой администратора.\n\n"
+        "• удалять пользователя из всех известных чатов (группы/каналы) командой администратора.\n\n"
         "Используй кнопки ниже для управления. /help — справка по командам."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
@@ -40,13 +40,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/add_users <username ...> — вручную добавить одного или нескольких пользователей по username в БД (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
-        "/sync_me — синхронизировать ваш id/имя и членство по всем известным группам бота.\n"
-        "/sync_everyone — синхронизировать всех пользователей БД по известным группам (только OWNER_USER_IDS).\n"
-        "/groups — показать все группы, в которых бот сейчас учитывается (только OWNER_USER_IDS).\n"
-        "/remove_group <chat_id> — убрать группу из списка учитываемых (только OWNER_USER_IDS).\n"
-        "/refresh_groups — перепроверить членство бота в известных группах и обновить список (только OWNER_USER_IDS).\n"
-        "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
-        "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
+        "/sync_me — синхронизировать ваш id/имя и членство по всем известным чатам бота.\n"
+        "/sync_everyone — синхронизировать всех пользователей БД по известным чатам (только OWNER_USER_IDS).\n"
+        "/groups — показать все чаты, в которых бот сейчас учитывается (только OWNER_USER_IDS).\n"
+        "/remove_group <chat_id> — убрать чат из списка учитываемых (только OWNER_USER_IDS).\n"
+        "/refresh_groups — перепроверить членство бота в известных чатах и обновить список (только OWNER_USER_IDS).\n"
+        "/user_groups <username> — показать чаты пользователя по логину (только OWNER_USER_IDS).\n"
+        "/remove_everywhere <username> — удалить пользователя из всех известных активных чатов по username "
         "(только OWNER_USER_IDS).\n"
         "/promote_admin <chat_id|all> <username> — назначить пользователя из БД администратором "
         "(только OWNER_USER_IDS).\n"
@@ -171,9 +171,9 @@ async def sync_me_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     lines = [
         f"Синхронизация завершена для @{username}.",
-        f"Проверено групп: {len(chats)}",
+        f"Проверено чатов: {len(chats)}",
         f"Записано статусов: {synced}",
-        f"Состоит в группах: {member_of}",
+        f"Состоит в чатах: {member_of}",
     ]
     if failed:
         lines.append(f"Ошибок: {len(failed)}")
@@ -224,7 +224,7 @@ async def sync_everyone_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     if not chats:
-        await update.message.reply_text("В базе нет активных групп для синхронизации.")
+        await update.message.reply_text("В базе нет активных чатов для синхронизации.")
         return
 
     processed_users = 0
@@ -280,10 +280,10 @@ async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     service: MembershipService = context.application.bot_data["membership_service"]
     chats = await service.list_active_chats()
     if not chats:
-        await update.message.reply_text("Список групп пуст.")
+        await update.message.reply_text("Список чатов пуст.")
         return
 
-    lines = ["Группы, в которых бот учитывается:"]
+    lines = ["Чаты (группы/каналы), в которых бот учитывается:"]
     for chat in chats:
         title = chat.title or "(без названия)"
         lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type}")
@@ -312,10 +312,10 @@ async def remove_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
     service: MembershipService = context.application.bot_data["membership_service"]
     removed = await service.deactivate_chat(chat_id)
     if not removed:
-        await update.message.reply_text(f"Группа с chat_id={chat_id} не найдена в базе.")
+        await update.message.reply_text(f"Чат с chat_id={chat_id} не найден в базе.")
         return
 
-    await update.message.reply_text(f"Группа с chat_id={chat_id} убрана из списка активных.")
+    await update.message.reply_text(f"Чат с chat_id={chat_id} убран из списка активных.")
 
 
 async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -330,7 +330,7 @@ async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_T
 
     me = await context.bot.get_me()
 
-    if update.effective_chat is not None and update.effective_chat.type in {"group", "supergroup"}:
+    if update.effective_chat is not None and update.effective_chat.type in {"group", "supergroup", "channel"}:
         try:
             current_chat_member = await context.bot.get_chat_member(update.effective_chat.id, me.id)
             await service.save_user_membership(
@@ -349,7 +349,7 @@ async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_T
 
     chats = await service.list_all_chats()
     if not chats:
-        await update.message.reply_text("В базе пока нет групп для обновления.")
+        await update.message.reply_text("В базе пока нет чатов для обновления.")
         return
 
     active_count = 0
@@ -370,7 +370,7 @@ async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_T
             failed.append(f"{chat.chat_id}: {exc}")
 
     lines = [
-        "Обновление списка групп завершено.",
+        "Обновление списка чатов завершено.",
         f"Всего проверено: {len(chats)}",
         f"Активных: {active_count}",
         f"Неактивных: {inactive_count}",
@@ -379,7 +379,7 @@ async def refresh_groups_command(update: Update, context: ContextTypes.DEFAULT_T
         lines.append(f"Ошибок: {len(failed)}")
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
 
-    lines.append("Важно: команда не может обнаружить полностью неизвестные группы без update от Telegram.")
+    lines.append("Важно: команда не может обнаружить полностью неизвестные чаты (группы/каналы) без update от Telegram.")
     await update.message.reply_text("\n".join(lines))
 
 
@@ -408,10 +408,10 @@ async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     if not chats:
-        await update.message.reply_text(f"Пользователь @{username} найден, но не состоит в активных группах.")
+        await update.message.reply_text(f"Пользователь @{username} найден, но не состоит в активных чатах.")
         return
 
-    lines = [f"Группы пользователя @{username} (id={user.id}):"]
+    lines = [f"Чаты пользователя @{username} (id={user.id}):"]
     for chat in chats:
         title = chat.title or "(без названия)"
         lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type} | status={chat.status}")
