@@ -159,7 +159,7 @@ def _clear_pending_action(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop("pending_stage", None)
     context.user_data.pop("pending_username", None)
     context.user_data.pop("pending_rights", None)
-    context.user_data.pop("pending_target_chat_ids", None)
+          context.user_data.pop("pending_target_chat_ids", None)
     context.user_data.pop("pending_rights_allowed", None)
 
 
