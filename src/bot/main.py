@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from telegram.ext import Application, ChatMemberHandler, CommandHandler
+from telegram.ext import Application, CallbackQueryHandler, ChatMemberHandler, CommandHandler, MessageHandler, filters
 
 from bot.config import load_settings
 from bot.db.models import Base
@@ -15,7 +15,12 @@ from bot.handlers import (
     list_users_command,
     on_chat_member_update,
     on_my_chat_member_update,
+    on_action_input,
+    on_inline_button,
+    promote_admin_command,
     remove_everywhere,
+    set_admin_rank_command,
+    set_admin_rights_command,
     refresh_groups_command,
     remove_group_command,
     start_command,
@@ -73,13 +78,18 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("users", list_users_command))
     app.add_handler(CommandHandler("user_groups", user_groups_command))
     app.add_handler(CommandHandler("remove_everywhere", remove_everywhere))
+    app.add_handler(CommandHandler("promote_admin", promote_admin_command))
+    app.add_handler(CommandHandler("set_admin_rank", set_admin_rank_command))
+    app.add_handler(CommandHandler("set_admin_rights", set_admin_rights_command))
+    app.add_handler(CallbackQueryHandler(on_inline_button))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_action_input))
 
     return app
 
 
 def main() -> None:
     application = build_application()
-    application.run_polling(allowed_updates=["chat_member", "my_chat_member", "message"])
+    application.run_polling(allowed_updates=["chat_member", "my_chat_member", "message", "callback_query"])
 
 
 if __name__ == "__main__":

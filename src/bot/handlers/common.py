@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.services.membership_service import MembershipService
+from bot.handlers.ui import build_main_keyboard
 
 
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -23,9 +24,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "• отслеживать изменения участников через chat_member обновления;\n"
         "• хранить состояние участников в базе;\n"
         "• удалять пользователя из всех известных групп командой администратора.\n\n"
-        "Напиши /help, чтобы увидеть список доступных команд."
+        "Используй кнопки ниже для управления. /help — справка по командам."
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -46,9 +47,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/refresh_groups — перепроверить членство бота в известных группах и обновить список (только OWNER_USER_IDS).\n"
         "/user_groups <username> — показать группы пользователя по логину (только OWNER_USER_IDS).\n"
         "/remove_everywhere <username> — удалить пользователя из всех известных активных групп по username "
+        "(только OWNER_USER_IDS).\n"
+        "/promote_admin <chat_id|all> <username> — назначить пользователя из БД администратором "
+        "(только OWNER_USER_IDS).\n"
+        "/set_admin_rank <chat_id|all> <username> <rank> — установить custom title (rank) администратора "
+        "(только OWNER_USER_IDS).\n"
+        "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
         "(только OWNER_USER_IDS)."
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
 
 
 async def add_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
