@@ -70,7 +70,7 @@ def build_main_keyboard(is_owner: bool) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton("📘 Помощь", callback_data=CB_HELP)],
         [InlineKeyboardButton("🔄 Синхронизировать меня", callback_data=CB_SYNC_ME)],
-        [InlineKeyboardButton("👤 Мои группы", callback_data=CB_MY_GROUPS)],
+        [InlineKeyboardButton("👤 Мои чаты", callback_data=CB_MY_GROUPS)],
     ]
     if is_owner:
         rows.append([InlineKeyboardButton("🛠 Админ-панель", callback_data=CB_OPEN_ADMIN)])
@@ -193,10 +193,10 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return
 
         if not chats:
-            await query.message.reply_text("Нет активных групп для вашего профиля.")
+            await query.message.reply_text("Нет активных чатов для вашего профиля.")
             return
 
-        lines = [f"Ваши группы (@{username}):"]
+        lines = [f"Ваши чаты (@{username}):"]
         for item in chats:
             title = item.title or "(без названия)"
             lines.append(f"- {title} | chat_id={item.chat_id} | status={item.status}")
@@ -230,10 +230,10 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data == CB_ADMIN_GROUPS:
         chats = await service.list_active_chats()
         if not chats:
-            await query.message.reply_text("Список групп пуст.")
+            await query.message.reply_text("Список чатов пуст.")
             return
 
-        lines = ["Группы, в которых бот учитывается:"]
+        lines = ["Чаты (группы/каналы), в которых бот учитывается:"]
         for chat in chats:
             title = chat.title or "(без названия)"
             lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type}")
@@ -243,7 +243,7 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data == CB_ACT_REMOVE:
         _set_pending_action(context, action=ACTION_REMOVE)
         await query.message.reply_text(
-            "Введи username пользователя для удаления из всех активных групп:\nПример: @alice",
+            "Введи username пользователя для удаления из всех активных чатов:\nПример: @alice",
             reply_markup=build_cancel_keyboard(),
         )
         return
@@ -251,7 +251,7 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data == CB_ACT_PROMOTE:
         _set_pending_action(context, action=ACTION_PROMOTE)
         await query.message.reply_text(
-            "Введи username пользователя для назначения админом во всех активных группах:\nПример: @alice",
+            "Введи username пользователя для назначения админом во всех активных чатах:\nПример: @alice",
             reply_markup=build_cancel_keyboard(),
         )
         return
@@ -259,7 +259,7 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data == CB_ACT_DEMOTE:
         _set_pending_action(context, action=ACTION_DEMOTE)
         await query.message.reply_text(
-            "Введи username администратора, которого нужно демоутить во всех его группах:\nПример: @alice",
+            "Введи username администратора, которого нужно демоутить во всех его чатах:\nПример: @alice",
             reply_markup=build_cancel_keyboard(),
         )
         return
@@ -343,7 +343,7 @@ async def _process_remove_everywhere(
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Нечего удалять.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Нечего удалять.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
@@ -391,7 +391,7 @@ async def _process_promote_admin(
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
@@ -437,7 +437,7 @@ async def _process_demote_admin(
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
@@ -505,7 +505,7 @@ async def _process_set_rank(
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
@@ -556,7 +556,7 @@ async def _process_set_rights(
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
@@ -646,7 +646,7 @@ async def _apply_selected_rights(
     if not chat_ids:
         _clear_pending_action(context)
         await query.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одной активной известной группе. Операция не требуется.",
+            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
             reply_markup=build_main_keyboard(_is_owner(update, context)),
         )
         return
