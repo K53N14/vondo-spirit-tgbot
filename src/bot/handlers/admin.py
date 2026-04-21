@@ -50,10 +50,23 @@ def _parse_target_chat_ids(raw_target: str, active_chat_ids: list[int]) -> tuple
             return [], "В базе нет активных групп."
         return active_chat_ids, None
 
-    try:
-        return [int(raw_target)], None
-    except ValueError:
-        return [], "chat_id должен быть числом или 'all'."
+    raw_parts = [part.strip() for part in raw_target.replace(" ", "").split(",") if part.strip()]
+    if not raw_parts:
+        return [], "Укажи all или список chat_id через запятую."
+
+    parsed_ids: list[int] = []
+    for part in raw_parts:
+        try:
+            parsed_ids.append(int(part))
+        except ValueError:
+            return [], f"Некорректный chat_id: {part}"
+
+    available = set(active_chat_ids)
+    target_ids = [chat_id for chat_id in parsed_ids if chat_id in available]
+    if not target_ids:
+        return [], "Ни один из указанных chat_id не подходит (пользователь не состоит в этих чатах)."
+
+    return target_ids, None
 
 
 def _parse_rights_assignments(tokens: list[str]) -> tuple[dict[str, bool] | None, str | None]:
@@ -158,7 +171,7 @@ async def promote_admin_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text("Использование: /promote_admin <chat_id|all> <username>")
+        await update.message.reply_text("Использование: /promote_admin <chat_id|all|chat_id,chat_id,...> <username>")
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
@@ -212,7 +225,7 @@ async def set_admin_rank_command(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     if len(context.args) < 3:
-        await update.message.reply_text("Использование: /set_admin_rank <chat_id|all> <username> <rank>")
+        await update.message.reply_text("Использование: /set_admin_rank <chat_id|all|chat_id,chat_id,...> <username> <rank>")
         return
 
     service: MembershipService = context.application.bot_data["membership_service"]
@@ -276,7 +289,7 @@ async def set_admin_rights_command(update: Update, context: ContextTypes.DEFAULT
 
     if len(context.args) < 3:
         await update.message.reply_text(
-            "Использование: /set_admin_rights <chat_id|all> <username> <right=true|false> [right=true|false ...]"
+            "Использование: /set_admin_rights <chat_id|all|chat_id,chat_id,...> <username> <right=true|false> [right=true|false ...]"
         )
         return
 

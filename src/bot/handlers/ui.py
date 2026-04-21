@@ -17,7 +17,8 @@ CB_ACT_REMOVE = "act_remove_everywhere"
 CB_ACT_PROMOTE = "act_promote_admin"
 CB_ACT_DEMOTE = "act_demote_admin"
 CB_ACT_RANK = "act_set_rank"
-CB_ACT_RIGHTS = "act_set_rights"
+CB_ACT_RIGHTS_GROUPS = "act_set_rights_groups"
+CB_ACT_RIGHTS_CHANNELS = "act_set_rights_channels"
 CB_CANCEL = "act_cancel"
 
 CB_RIGHTS_TOGGLE_PREFIX = "rights_toggle:"
@@ -27,7 +28,8 @@ ACTION_REMOVE = "remove_everywhere"
 ACTION_PROMOTE = "promote_admin"
 ACTION_DEMOTE = "demote_admin"
 ACTION_SET_RANK = "set_rank"
-ACTION_SET_RIGHTS = "set_rights"
+ACTION_SET_RIGHTS_GROUPS = "set_rights_groups"
+ACTION_SET_RIGHTS_CHANNELS = "set_rights_channels"
 
 ALLOWED_ADMIN_RIGHTS = {
     "is_anonymous",
@@ -45,6 +47,37 @@ ALLOWED_ADMIN_RIGHTS = {
     "can_edit_messages",
     "can_pin_messages",
     "can_manage_topics",
+}
+
+GROUP_ADMIN_RIGHTS = {
+    "is_anonymous",
+    "can_manage_chat",
+    "can_delete_messages",
+    "can_manage_video_chats",
+    "can_restrict_members",
+    "can_promote_members",
+    "can_change_info",
+    "can_invite_users",
+    "can_post_stories",
+    "can_edit_stories",
+    "can_delete_stories",
+    "can_pin_messages",
+    "can_manage_topics",
+}
+
+CHANNEL_ADMIN_RIGHTS = {
+    "is_anonymous",
+    "can_manage_chat",
+    "can_delete_messages",
+    "can_manage_video_chats",
+    "can_promote_members",
+    "can_change_info",
+    "can_invite_users",
+    "can_post_stories",
+    "can_edit_stories",
+    "can_delete_stories",
+    "can_post_messages",
+    "can_edit_messages",
 }
 
 DEFAULT_ADMIN_RIGHTS: dict[str, bool] = {
@@ -91,7 +124,10 @@ def build_admin_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⏬ Демоутить админа", callback_data=CB_ACT_DEMOTE),
             InlineKeyboardButton("🏷 Установить rank", callback_data=CB_ACT_RANK),
         ],
-        [InlineKeyboardButton("🔐 Изменить права (чекбоксы)", callback_data=CB_ACT_RIGHTS)],
+        [
+            InlineKeyboardButton("🔐 Права для групп", callback_data=CB_ACT_RIGHTS_GROUPS),
+            InlineKeyboardButton("📣 Права для каналов", callback_data=CB_ACT_RIGHTS_CHANNELS),
+        ],
         [InlineKeyboardButton("↩️ В главное меню", callback_data=CB_BACK_MAIN)],
     ]
     return InlineKeyboardMarkup(rows)
@@ -106,9 +142,9 @@ def build_cancel_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_rights_keyboard(selected: dict[str, bool]) -> InlineKeyboardMarkup:
+def build_rights_keyboard(selected: dict[str, bool], allowed_rights: set[str]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    for right in sorted(ALLOWED_ADMIN_RIGHTS):
+    for right in sorted(allowed_rights):
         mark = "✅" if selected.get(right, False) else "⬜"
         rows.append([InlineKeyboardButton(f"{mark} {right}", callback_data=f"{CB_RIGHTS_TOGGLE_PREFIX}{right}")])
 
@@ -123,6 +159,8 @@ def _clear_pending_action(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop("pending_stage", None)
     context.user_data.pop("pending_username", None)
     context.user_data.pop("pending_rights", None)
+    context.user_data.pop("pending_target_chat_ids", None)
+    context.user_data.pop("pending_rights_allowed", None)
 
 
 def _set_pending_action(context: ContextTypes.DEFAULT_TYPE, *, action: str, stage: str = "input") -> None:
@@ -139,6 +177,32 @@ def mark_removal_cleanup(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_
 async def _get_user_chat_ids(service: MembershipService, username: str) -> list[int]:
     _, chats = await service.list_user_chats_by_username(username)
     return [chat.chat_id for chat in chats]
+
+
+def _parse_scope_input(raw_scope: str, available_chat_ids: list[int]) -> tuple[list[int], str | None]:
+    scope = raw_scope.strip().lower()
+    if scope == "all":
+        if not available_chat_ids:
+            return [], "У пользователя нет доступных чатов для операции."
+        return available_chat_ids, None
+
+    raw_parts = [part.strip() for part in raw_scope.replace(" ", "").split(",") if part.strip()]
+    if not raw_parts:
+        return [], "Укажи all или список chat_id через запятую."
+
+    parsed_ids: list[int] = []
+    for part in raw_parts:
+        try:
+            parsed_ids.append(int(part))
+        except ValueError:
+            return [], f"Некорректный chat_id: {part}"
+
+    available_set = set(available_chat_ids)
+    target_ids = [chat_id for chat_id in parsed_ids if chat_id in available_set]
+    if not target_ids:
+        return [], "Ни один из указанных chat_id не подходит (пользователь не состоит в этих чатах)."
+
+    return target_ids, None
 
 
 async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -272,10 +336,18 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
 
-    if data == CB_ACT_RIGHTS:
-        _set_pending_action(context, action=ACTION_SET_RIGHTS, stage="username")
+    if data == CB_ACT_RIGHTS_GROUPS:
+        _set_pending_action(context, action=ACTION_SET_RIGHTS_GROUPS, stage="username")
         await query.message.reply_text(
-            "Введи username пользователя, которому нужно изменить права:\nПример: @alice",
+            "Введи username пользователя, которому нужно изменить ПРАВА ДЛЯ ГРУПП:\nПример: @alice",
+            reply_markup=build_cancel_keyboard(),
+        )
+        return
+
+    if data == CB_ACT_RIGHTS_CHANNELS:
+        _set_pending_action(context, action=ACTION_SET_RIGHTS_CHANNELS, stage="username")
+        await query.message.reply_text(
+            "Введи username пользователя, которому нужно изменить ПРАВА ДЛЯ КАНАЛОВ:\nПример: @alice",
             reply_markup=build_cancel_keyboard(),
         )
 
@@ -316,7 +388,7 @@ async def on_action_input(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _process_set_rank(update, context, service, text)
         return
 
-    if action == ACTION_SET_RIGHTS:
+    if action in {ACTION_SET_RIGHTS_GROUPS, ACTION_SET_RIGHTS_CHANNELS}:
         await _process_set_rights(update, context, service, text)
 
 
@@ -374,31 +446,54 @@ async def _process_promote_admin(
     service: MembershipService,
     raw_username: str,
 ) -> None:
-    username = raw_username.lstrip("@").strip()
-    target_user = await service.get_user_by_username(username)
-    if target_user is None:
-        await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
-        return
+    stage = context.user_data.get("pending_stage", "input")
 
-    if target_user.id <= 0:
+    if stage == "input":
+        username = raw_username.lstrip("@").strip()
+        target_user = await service.get_user_by_username(username)
+        if target_user is None:
+            await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
+            return
+        if target_user.id <= 0:
+            await update.message.reply_text(
+                "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+                reply_markup=build_cancel_keyboard(),
+            )
+            return
+
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        if not user_chat_ids:
+            _clear_pending_action(context)
+            await update.message.reply_text(
+                f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
+                reply_markup=build_main_keyboard(_is_owner(update, context)),
+            )
+            return
+
+        context.user_data["pending_username"] = username
+        context.user_data["pending_stage"] = "scope"
         await update.message.reply_text(
-            "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+            "Укажи, где применить действие: all или список chat_id через запятую.\n"
+            "Пример: all\n"
+            "Пример: -100111,-100222",
             reply_markup=build_cancel_keyboard(),
         )
         return
 
-    chat_ids = await _get_user_chat_ids(service, username)
-    if not chat_ids:
-        _clear_pending_action(context)
-        await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
-            reply_markup=build_main_keyboard(_is_owner(update, context)),
-        )
+    username = str(context.user_data.get("pending_username", "")).strip()
+    target_user = await service.get_user_by_username(username)
+    if target_user is None or target_user.id <= 0:
+        await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
+        return
+
+    user_chat_ids = await _get_user_chat_ids(service, username)
+    chat_ids, scope_error = _parse_scope_input(raw_username, user_chat_ids)
+    if scope_error:
+        await update.message.reply_text(scope_error, reply_markup=build_cancel_keyboard())
         return
 
     success = 0
     failed: list[str] = []
-
     for chat_id in chat_ids:
         try:
             await context.bot.promote_chat_member(chat_id=chat_id, user_id=target_user.id, **DEFAULT_ADMIN_RIGHTS)
@@ -410,7 +505,6 @@ async def _process_promote_admin(
     lines = [f"Назначение @{username} администратором завершено.", f"Успешно: {success}", f"Ошибок: {len(failed)}"]
     if failed:
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
-
     await update.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
 
 
@@ -420,32 +514,55 @@ async def _process_demote_admin(
     service: MembershipService,
     raw_username: str,
 ) -> None:
-    username = raw_username.lstrip("@").strip()
-    target_user = await service.get_user_by_username(username)
-    if target_user is None:
-        await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
-        return
+    stage = context.user_data.get("pending_stage", "input")
 
-    if target_user.id <= 0:
+    if stage == "input":
+        username = raw_username.lstrip("@").strip()
+        target_user = await service.get_user_by_username(username)
+        if target_user is None:
+            await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
+            return
+        if target_user.id <= 0:
+            await update.message.reply_text(
+                "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+                reply_markup=build_cancel_keyboard(),
+            )
+            return
+
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        if not user_chat_ids:
+            _clear_pending_action(context)
+            await update.message.reply_text(
+                f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
+                reply_markup=build_main_keyboard(_is_owner(update, context)),
+            )
+            return
+
+        context.user_data["pending_username"] = username
+        context.user_data["pending_stage"] = "scope"
         await update.message.reply_text(
-            "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+            "Укажи, где применить демоут: all или список chat_id через запятую.\n"
+            "Пример: all\n"
+            "Пример: -100111,-100222",
             reply_markup=build_cancel_keyboard(),
         )
         return
 
-    chat_ids = await _get_user_chat_ids(service, username)
-    if not chat_ids:
-        _clear_pending_action(context)
-        await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
-            reply_markup=build_main_keyboard(_is_owner(update, context)),
-        )
+    username = str(context.user_data.get("pending_username", "")).strip()
+    target_user = await service.get_user_by_username(username)
+    if target_user is None or target_user.id <= 0:
+        await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
+        return
+
+    user_chat_ids = await _get_user_chat_ids(service, username)
+    chat_ids, scope_error = _parse_scope_input(raw_username, user_chat_ids)
+    if scope_error:
+        await update.message.reply_text(scope_error, reply_markup=build_cancel_keyboard())
         return
 
     demote_rights = {right: False for right in ALLOWED_ADMIN_RIGHTS}
     success = 0
     failed: list[str] = []
-
     for chat_id in chat_ids:
         try:
             await context.bot.promote_chat_member(chat_id=chat_id, user_id=target_user.id, **demote_rights)
@@ -457,7 +574,6 @@ async def _process_demote_admin(
     lines = [f"Демоут @{username} завершен.", f"Успешно: {success}", f"Ошибок: {len(failed)}"]
     if failed:
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
-
     await update.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
 
 
@@ -482,7 +598,33 @@ async def _process_set_rank(
             )
             return
 
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        if not user_chat_ids:
+            _clear_pending_action(context)
+            await update.message.reply_text(
+                f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
+                reply_markup=build_main_keyboard(_is_owner(update, context)),
+            )
+            return
+
         context.user_data["pending_username"] = username
+        context.user_data["pending_stage"] = "scope"
+        await update.message.reply_text(
+            "Укажи, где применить rank: all или список chat_id через запятую.\n"
+            "Пример: all\n"
+            "Пример: -100111,-100222",
+            reply_markup=build_cancel_keyboard(),
+        )
+        return
+
+    if stage == "scope":
+        username = str(context.user_data.get("pending_username", "")).strip()
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        target_chat_ids, scope_error = _parse_scope_input(user_input, user_chat_ids)
+        if scope_error:
+            await update.message.reply_text(scope_error, reply_markup=build_cancel_keyboard())
+            return
+        context.user_data["pending_target_chat_ids"] = target_chat_ids
         context.user_data["pending_stage"] = "rank"
         await update.message.reply_text(
             f"Введите rank для @{username}:\nПример: Senior Moderator",
@@ -501,7 +643,7 @@ async def _process_set_rank(
         await update.message.reply_text("Пользователь больше недоступен в БД.", reply_markup=build_cancel_keyboard())
         return
 
-    chat_ids = await _get_user_chat_ids(service, username)
+    chat_ids = context.user_data.get("pending_target_chat_ids") or await _get_user_chat_ids(service, username)
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
@@ -535,40 +677,61 @@ async def _process_set_rights(
     user_input: str,
 ) -> None:
     stage = context.user_data.get("pending_stage", "username")
+    action = context.user_data.get("pending_action")
+    allowed_rights = GROUP_ADMIN_RIGHTS if action == ACTION_SET_RIGHTS_GROUPS else CHANNEL_ADMIN_RIGHTS
 
-    if stage != "username":
-        await update.message.reply_text("Используй кнопки выбора прав или отмени действие.", reply_markup=build_cancel_keyboard())
-        return
+    if stage == "username":
+        username = user_input.lstrip("@").strip()
+        target_user = await service.get_user_by_username(username)
+        if target_user is None:
+            await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
+            return
+        if target_user.id <= 0:
+            await update.message.reply_text(
+                "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+                reply_markup=build_cancel_keyboard(),
+            )
+            return
 
-    username = user_input.lstrip("@").strip()
-    target_user = await service.get_user_by_username(username)
-    if target_user is None:
-        await update.message.reply_text(f"Пользователь @{username} не найден в базе.", reply_markup=build_cancel_keyboard())
-        return
-    if target_user.id <= 0:
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        if not user_chat_ids:
+            _clear_pending_action(context)
+            await update.message.reply_text(
+                f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
+                reply_markup=build_main_keyboard(_is_owner(update, context)),
+            )
+            return
+
+        context.user_data["pending_username"] = username
+        context.user_data["pending_stage"] = "scope"
         await update.message.reply_text(
-            "У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.",
+            "Укажи, где применить изменение прав: all или список chat_id через запятую.\n"
+            "Пример: all\n"
+            "Пример: -100111,-100222",
             reply_markup=build_cancel_keyboard(),
         )
         return
 
-    chat_ids = await _get_user_chat_ids(service, username)
-    if not chat_ids:
-        _clear_pending_action(context)
+    if stage == "scope":
+        username = str(context.user_data.get("pending_username", "")).strip()
+        user_chat_ids = await _get_user_chat_ids(service, username)
+        target_chat_ids, scope_error = _parse_scope_input(user_input, user_chat_ids)
+        if scope_error:
+            await update.message.reply_text(scope_error, reply_markup=build_cancel_keyboard())
+            return
+
+        context.user_data["pending_target_chat_ids"] = target_chat_ids
+        context.user_data["pending_stage"] = "rights_select"
+        context.user_data["pending_rights_allowed"] = list(sorted(allowed_rights))
+        context.user_data["pending_rights"] = {right: False for right in allowed_rights}
+
         await update.message.reply_text(
-            f"Пользователь @{username} не состоит ни в одном активном известном чате. Операция не требуется.",
-            reply_markup=build_main_keyboard(_is_owner(update, context)),
+            f"Выбери права для @{username}. ✅ — право будет выдано, ⬜ — право будет снято.",
+            reply_markup=build_rights_keyboard(context.user_data["pending_rights"], allowed_rights),
         )
         return
 
-    context.user_data["pending_username"] = username
-    context.user_data["pending_stage"] = "rights_select"
-    context.user_data["pending_rights"] = {right: False for right in ALLOWED_ADMIN_RIGHTS}
-
-    await update.message.reply_text(
-        f"Выбери права для @{username}. ✅ — право будет выдано, ⬜ — право будет снято.",
-        reply_markup=build_rights_keyboard(context.user_data["pending_rights"]),
-    )
+    await update.message.reply_text("Используй кнопки выбора прав или отмени действие.", reply_markup=build_cancel_keyboard())
 
 
 async def on_left_chat_member_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -598,22 +761,23 @@ async def _handle_rights_toggle(update: Update, context: ContextTypes.DEFAULT_TY
     if query is None:
         return
 
-    if context.user_data.get("pending_action") != ACTION_SET_RIGHTS or context.user_data.get("pending_stage") != "rights_select":
+    if context.user_data.get("pending_action") not in {ACTION_SET_RIGHTS_GROUPS, ACTION_SET_RIGHTS_CHANNELS} or context.user_data.get("pending_stage") != "rights_select":
         await query.message.reply_text("Нет активного сценария изменения прав. Запусти его из админ-панели.")
         return
 
     right = data.replace(CB_RIGHTS_TOGGLE_PREFIX, "", 1)
-    if right not in ALLOWED_ADMIN_RIGHTS:
+    allowed = set(context.user_data.get("pending_rights_allowed") or [])
+    if right not in allowed:
         return
 
     selected = context.user_data.get("pending_rights")
     if not isinstance(selected, dict):
-        selected = {r: False for r in ALLOWED_ADMIN_RIGHTS}
+        selected = {r: False for r in allowed}
 
     selected[right] = not bool(selected.get(right, False))
     context.user_data["pending_rights"] = selected
 
-    await query.edit_message_reply_markup(reply_markup=build_rights_keyboard(selected))
+    await query.edit_message_reply_markup(reply_markup=build_rights_keyboard(selected, allowed))
 
 
 async def _apply_selected_rights(
@@ -625,7 +789,7 @@ async def _apply_selected_rights(
     if query is None:
         return
 
-    if context.user_data.get("pending_action") != ACTION_SET_RIGHTS or context.user_data.get("pending_stage") != "rights_select":
+    if context.user_data.get("pending_action") not in {ACTION_SET_RIGHTS_GROUPS, ACTION_SET_RIGHTS_CHANNELS} or context.user_data.get("pending_stage") != "rights_select":
         await query.message.reply_text("Нет активного сценария изменения прав. Запусти его из админ-панели.")
         return
 
@@ -642,7 +806,7 @@ async def _apply_selected_rights(
         _clear_pending_action(context)
         return
 
-    chat_ids = await _get_user_chat_ids(service, username)
+    chat_ids = context.user_data.get("pending_target_chat_ids") or await _get_user_chat_ids(service, username)
     if not chat_ids:
         _clear_pending_action(context)
         await query.message.reply_text(
@@ -651,7 +815,8 @@ async def _apply_selected_rights(
         )
         return
 
-    rights_payload = {right: bool(selected.get(right, False)) for right in ALLOWED_ADMIN_RIGHTS}
+    allowed = set(context.user_data.get("pending_rights_allowed") or [])
+    rights_payload = {right: bool(selected.get(right, False)) for right in allowed}
     success = 0
     failed: list[str] = []
 
