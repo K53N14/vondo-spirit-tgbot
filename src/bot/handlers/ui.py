@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bot.handlers.common import sync_me_command
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
@@ -10,6 +11,7 @@ CB_SYNC_ME = "main_sync_me"
 CB_MY_GROUPS = "main_my_groups"
 CB_OPEN_ADMIN = "main_open_admin"
 CB_BACK_MAIN = "main_back"
+CB_DEFAULT_CHATS = "main_default_chats"
 
 CB_ADMIN_USERS = "admin_users"
 CB_ADMIN_GROUPS = "admin_groups"
@@ -105,6 +107,7 @@ def build_main_keyboard(is_owner: bool) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📘 Помощь", callback_data=CB_HELP)],
         [InlineKeyboardButton("🔄 Синхронизировать меня", callback_data=CB_SYNC_ME)],
         [InlineKeyboardButton("👤 Мои чаты", callback_data=CB_MY_GROUPS)],
+        [InlineKeyboardButton("👤 Приглашения в основные чаты", callback_data=CB_DEFAULT_CHATS)],
     ]
     if is_owner:
         rows.append([InlineKeyboardButton("🛠 Админ-панель", callback_data=CB_OPEN_ADMIN)])
@@ -243,7 +246,11 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if data == CB_SYNC_ME:
-        await query.message.reply_text("Для полной синхронизации текущего пользователя используй /sync_me.")
+        await sync_me_command(update, context)
+        return
+    
+    if data == CB_DEFAULT_CHATS:
+        await sync_me_command(update, context)
         return
 
     if data == CB_MY_GROUPS:

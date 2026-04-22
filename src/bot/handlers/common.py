@@ -56,6 +56,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "(только OWNER_USER_IDS).\n"
         "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
         "(только OWNER_USER_IDS)."
+        "/add_to_default_chats — отправить вам приглашения в основные чаты."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
 
@@ -535,16 +536,18 @@ async def default_chats_list(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def add_to_default_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.effective_user is None:
         return
-
-    if not _is_owner(update, context):
-        await update.message.reply_text("У вас нет прав.")
+    username = (update.effective_user.username or "").strip()
+    if not username:
+        await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
         return
 
-    if not context.args:
-        await update.message.reply_text("Использование: /add_to_default_chats <username>")
-        return
+    # if not _is_owner(update, context):
+    #     await update.message.reply_text("У вас нет прав.")
+    #     return
 
-    username = context.args[0].strip().lstrip("@")
+    # if not context.args:
+    #     await update.message.reply_text("Использование: /add_to_default_chats <username>")
+    #     return
 
     service: MembershipService = context.application.bot_data["membership_service"]
     target_user = await service.get_user_by_username(username)
