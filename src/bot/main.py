@@ -34,7 +34,7 @@ from bot.handlers import (
 )
 from bot.services import MembershipService
 
-DEFAULT_CHATS_KEY = "default_target_chat_ids"
+DEFAULT_CHATS_KEY = "default_chat_ids"
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",

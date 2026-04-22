@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 from bot.services.membership_service import MembershipService
 from bot.handlers.ui import build_main_keyboard
 
-DEFAULT_CHATS_KEY = "default_target_chat_ids"
+DEFAULT_CHATS_KEY = "default_chat_ids"
 
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_user is None:
