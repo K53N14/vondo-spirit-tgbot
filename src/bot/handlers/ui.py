@@ -245,9 +245,6 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if data == CB_SYNC_ME:
-        if update.effective_user is None or update.message is None:
-            return
-
         username = (update.effective_user.username or "").strip()
         if not username:
             await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
@@ -305,8 +302,6 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     if data == CB_DEFAULT_CHATS:
-        if update.message is None or update.effective_user is None:
-            return
         username = (update.effective_user.username or "").strip()
         if not username:
             await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
