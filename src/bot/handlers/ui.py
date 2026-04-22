@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bot.handlers.common import sync_me_command
+from bot.handlers.common import add_to_default_chats, sync_me_command
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
@@ -246,11 +246,114 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if data == CB_SYNC_ME:
-        await sync_me_command(update, context)
+        if update.effective_user is None or update.message is None:
+            return
+
+        username = (update.effective_user.username or "").strip()
+        if not username:
+            await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
+            return
+
+        service: MembershipService = context.application.bot_data["membership_service"]
+        existing_user = await service.get_user_by_username(username)
+        if existing_user is None:
+            await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_users <username ...>.")
+            return
+
+        await service.upsert_user_profile(
+            user_id=update.effective_user.id,
+            username=username,
+            full_name=update.effective_user.full_name,
+            is_bot=update.effective_user.is_bot,
+        )
+
+        chats = await service.list_active_chats()
+        synced = 0
+        member_of = 0
+        failed: list[str] = []
+
+        for chat in chats:
+            try:
+                member = await context.bot.get_chat_member(chat_id=chat.chat_id, user_id=update.effective_user.id)
+                status = member.status
+                await service.save_user_membership(
+                    chat_id=chat.chat_id,
+                    chat_title=chat.title,
+                    chat_type=chat.chat_type,
+                    user_id=update.effective_user.id,
+                    username=username,
+                    full_name=update.effective_user.full_name,
+                    is_bot=update.effective_user.is_bot,
+                    status=status,
+                )
+                synced += 1
+                if status in {"creator", "administrator", "member", "restricted"}:
+                    member_of += 1
+            except Exception as exc:
+                failed.append(f"{chat.chat_id}: {exc}")
+
+        lines = [
+            f"Синхронизация завершена для @{username}.",
+            f"Проверено чатов: {len(chats)}",
+            f"Записано статусов: {synced}",
+            f"Состоит в чатах: {member_of}",
+        ]
+        if failed:
+            lines.append(f"Ошибок: {len(failed)}")
+            lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
+
+        await update.message.reply_text("\n".join(lines))
         return
     
     if data == CB_DEFAULT_CHATS:
-        await sync_me_command(update, context)
+        if update.message is None or update.effective_user is None:
+            return
+        username = (update.effective_user.username or "").strip()
+        if not username:
+            await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
+            return
+
+        # if not _is_owner(update, context):
+        #     await update.message.reply_text("У вас нет прав.")
+        #     return
+
+        # if not context.args:
+        #     await update.message.reply_text("Использование: /add_to_default_chats <username>")
+        #     return
+
+        service: MembershipService = context.application.bot_data["membership_service"]
+        target_user = await service.get_user_by_username(username)
+
+        if target_user is None:
+            await update.message.reply_text(f"Пользователь @{username} не найден.")
+            return
+
+        chat_ids: set[int] = context.application.bot_data.get(DEFAULT_CHATS_KEY, set())
+
+        if not chat_ids:
+            await update.message.reply_text("Список дефолтных чатов пуст.")
+            return
+
+        success_links: list[str] = []
+        failed: list[str] = []
+
+        for chat_id in chat_ids:
+            try:
+                link = await context.bot.create_chat_invite_link(chat_id=chat_id, member_limit=1)
+                success_links.append(link.invite_link)
+            except Exception as exc:
+                failed.append(f"{chat_id}: {exc}")
+
+        lines = [
+            f"Ссылки для @{username}:",
+            *success_links
+        ]
+
+        if failed:
+            lines.append("\nОшибки:")
+            lines.extend(failed[:10])
+
+        await update.message.reply_text("\n".join(lines))
         return
 
     if data == CB_MY_GROUPS:
