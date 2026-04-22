@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from bot.handlers.common import add_to_default_chats
 from telegram.ext import Application, CallbackQueryHandler, ChatMemberHandler, CommandHandler, MessageHandler, filters
 
 from bot.config import load_settings
@@ -87,6 +88,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("promote_admin", promote_admin_command))
     app.add_handler(CommandHandler("set_admin_rank", set_admin_rank_command))
     app.add_handler(CommandHandler("set_admin_rights", set_admin_rights_command))
+    app.add_handler(CommandHandler("add_to_default_chats", add_to_default_chats))
     app.add_handler(CallbackQueryHandler(on_inline_button))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_chat_member_cleanup))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_action_input))
