@@ -66,6 +66,9 @@ def build_application() -> Application:
     app.bot_data["owner_user_ids"] = settings.owner_user_ids
     app.bot_data["membership_service"] = membership_service
 
+    #########################добавление дефолт чатов
+    app.bot_data["default_chat_ids"] = settings.default_chat_ids
+
     app.add_handler(ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_handler(CommandHandler("start", start_command))

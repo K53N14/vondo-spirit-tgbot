@@ -435,3 +435,147 @@ async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type} | status={chat.status}")
 
     await update.message.reply_text("\n".join(lines))
+
+async def default_chats_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /default_chats_add <chat_id,chat_id,...>")
+        return
+
+    raw = context.args[0]
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+
+    added: list[int] = []
+    invalid: list[str] = []
+
+    storage: set[int] = context.application.bot_data.setdefault(DEFAULT_CHATS_KEY, set())
+
+    for part in parts:
+        try:
+            chat_id = int(part)
+            if chat_id not in storage:
+                storage.add(chat_id)
+                added.append(chat_id)
+        except ValueError:
+            invalid.append(part)
+
+    lines = [
+        f"Добавлено: {len(added)}",
+    ]
+    if added:
+        lines.append(", ".join(map(str, added)))
+
+    if invalid:
+        lines.append(f"Некорректные id: {', '.join(invalid)}")
+
+    await update.message.reply_text("\n".join(lines))
+
+async def default_chats_remove(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /default_chats_remove <chat_id,...>")
+        return
+
+    storage: set[int] = context.application.bot_data.get(DEFAULT_CHATS_KEY, set())
+
+    parts = [p.strip() for p in context.args[0].split(",") if p.strip()]
+
+    removed: list[int] = []
+    not_found: list[int] = []
+
+    for part in parts:
+        try:
+            chat_id = int(part)
+            if chat_id in storage:
+                storage.remove(chat_id)
+                removed.append(chat_id)
+            else:
+                not_found.append(chat_id)
+        except ValueError:
+            continue
+
+    lines = [
+        f"Удалено: {len(removed)}",
+    ]
+    if removed:
+        lines.append(", ".join(map(str, removed)))
+
+    if not_found:
+        lines.append(f"Не найдены: {', '.join(map(str, not_found))}")
+
+    await update.message.reply_text("\n".join(lines))
+
+async def default_chats_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    storage: set[int] = context.application.bot_data.get(DEFAULT_CHATS_KEY, set())
+
+    if not storage:
+        await update.message.reply_text("Список дефолтных чатов пуст.")
+        return
+
+    await update.message.reply_text(
+        "Дефолтные чаты:\n" + "\n".join(map(str, storage))
+    )
+
+async def add_to_default_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Использование: /add_to_default_chats <username>")
+        return
+
+    username = context.args[0].strip().lstrip("@")
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    target_user = await service.get_user_by_username(username)
+
+    if target_user is None:
+        await update.message.reply_text(f"Пользователь @{username} не найден.")
+        return
+
+    chat_ids: set[int] = context.application.bot_data.get(DEFAULT_CHATS_KEY, set())
+
+    if not chat_ids:
+        await update.message.reply_text("Список дефолтных чатов пуст.")
+        return
+
+    success_links: list[str] = []
+    failed: list[str] = []
+
+    for chat_id in chat_ids:
+        try:
+            link = await context.bot.create_chat_invite_link(chat_id=chat_id, member_limit=1)
+            success_links.append(link.invite_link)
+        except Exception as exc:
+            failed.append(f"{chat_id}: {exc}")
+
+    lines = [
+        f"Ссылки для @{username}:",
+        *success_links
+    ]
+
+    if failed:
+        lines.append("\nОшибки:")
+        lines.extend(failed[:10])
+
+    await update.message.reply_text("\n".join(lines))
+

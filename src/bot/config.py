@@ -58,8 +58,12 @@ def load_settings() -> Settings:
     raw_owner_ids = os.getenv("OWNER_USER_IDS", "")
     owner_ids = {int(v.strip()) for v in raw_owner_ids.split(",") if v.strip()}
 
+    raw_chat_ids = os.getenv("DEFAULT_CHAT_IDS", "")
+    chat_ids = {int(v.strip()) for v in raw_chat_ids.split(",") if v.strip()}
+
     return Settings(
         bot_token=token,
         database_url=database_url,
         owner_user_ids=owner_ids,
+        default_chat_ids=chat_ids,
     )
