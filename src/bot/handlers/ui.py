@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from bot.handlers.common import add_to_default_chats, sync_me_command
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
