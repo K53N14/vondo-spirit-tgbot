@@ -12,6 +12,7 @@ class Settings:
     bot_token: str
     database_url: str
     owner_user_ids: set[int]
+    default_chat_ids: set[int]
 
 
 def _normalize_database_url(raw_url: str) -> str:
