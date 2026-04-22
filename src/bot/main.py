@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from email.mime import application
 import logging
 
 from bot.handlers.common import add_to_default_chats
@@ -33,6 +34,7 @@ from bot.handlers import (
 )
 from bot.services import MembershipService
 
+DEFAULT_CHATS_KEY = "default_target_chat_ids"
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -69,6 +71,8 @@ def build_application() -> Application:
 
     #########################добавление дефолт чатов
     app.bot_data["default_chat_ids"] = settings.default_chat_ids
+    if DEFAULT_CHATS_KEY not in app.bot_data:
+        app.bot_data[DEFAULT_CHATS_KEY] = set()
 
     app.add_handler(ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
