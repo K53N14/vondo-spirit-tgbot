@@ -247,13 +247,13 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data == CB_SYNC_ME:
         username = (update.effective_user.username or "").strip()
         if not username:
-            await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
+            await query.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
             return
 
         service: MembershipService = context.application.bot_data["membership_service"]
         existing_user = await service.get_user_by_username(username)
         if existing_user is None:
-            await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_users <username ...>.")
+            await query.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас через /add_users <username ...>.")
             return
 
         await service.upsert_user_profile(
@@ -298,13 +298,13 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             lines.append(f"Ошибок: {len(failed)}")
             lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:5]])
 
-        await update.message.reply_text("\n".join(lines))
+        await query.message.reply_text("\n".join(lines))
         return
     
     if data == CB_DEFAULT_CHATS:
         username = (update.effective_user.username or "").strip()
         if not username:
-            await update.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
+            await query.message.reply_text("У вас не установлен username в Telegram. Установите username и повторите /sync_me.")
             return
 
         # if not _is_owner(update, context):
@@ -319,13 +319,13 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         target_user = await service.get_user_by_username(username)
 
         if target_user is None:
-            await update.message.reply_text(f"Пользователь @{username} не найден.")
+            await query.message.reply_text(f"Пользователь @{username} не найден.")
             return
 
-        chat_ids: set[int] = context.application.bot_data.get(DEFAULT_CHATS_KEY, set())
+        chat_ids: set[int] = context.application.bot_data.get("default_chat_ids", set())
 
         if not chat_ids:
-            await update.message.reply_text("Список дефолтных чатов пуст.")
+            await query.message.reply_text("Список дефолтных чатов пуст.")
             return
 
         success_links: list[str] = []
@@ -347,7 +347,7 @@ async def on_inline_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             lines.append("\nОшибки:")
             lines.extend(failed[:10])
 
-        await update.message.reply_text("\n".join(lines))
+        await query.message.reply_text("\n".join(lines))
         return
 
     if data == CB_MY_GROUPS:
