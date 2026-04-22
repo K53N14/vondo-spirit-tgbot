@@ -38,6 +38,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start — приветствие и краткое описание возможностей бота.\n"
         "/help — список команд и их описание.\n"
         "/add_users <username ...> — вручную добавить одного или нескольких пользователей по username в БД (только OWNER_USER_IDS).\n"
+        "/create_chat_bundle — запустить мастер создания набора чатов по названию (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным чатам бота.\n"
@@ -94,6 +95,23 @@ async def add_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         added.append(f"@{username} (id={user.id})")
 
     await update.message.reply_text("Добавлены/обновлены пользователи:\n" + "\n".join(f"- {item}" for item in added))
+
+
+async def create_chat_bundle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    context.user_data["pending_action"] = "create_chat_bundle"
+    await update.message.reply_text(
+        "Введите базовое название чата.\n"
+        "Бот подготовит набор из двух чатов:\n"
+        "1) <Название>\n"
+        "2) <Название> — Inside"
+    )
 
 
 async def delete_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

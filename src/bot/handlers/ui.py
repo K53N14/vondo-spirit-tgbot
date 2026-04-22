@@ -30,6 +30,7 @@ ACTION_DEMOTE = "demote_admin"
 ACTION_SET_RANK = "set_rank"
 ACTION_SET_RIGHTS_GROUPS = "set_rights_groups"
 ACTION_SET_RIGHTS_CHANNELS = "set_rights_channels"
+ACTION_CREATE_CHAT_BUNDLE = "create_chat_bundle"
 
 ALLOWED_ADMIN_RIGHTS = {
     "is_anonymous",
@@ -159,7 +160,7 @@ def _clear_pending_action(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop("pending_stage", None)
     context.user_data.pop("pending_username", None)
     context.user_data.pop("pending_rights", None)
-          context.user_data.pop("pending_target_chat_ids", None)
+    context.user_data.pop("pending_target_chat_ids", None)
     context.user_data.pop("pending_rights_allowed", None)
 
 
@@ -390,6 +391,10 @@ async def on_action_input(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if action in {ACTION_SET_RIGHTS_GROUPS, ACTION_SET_RIGHTS_CHANNELS}:
         await _process_set_rights(update, context, service, text)
+        return
+
+    if action == ACTION_CREATE_CHAT_BUNDLE:
+        await _process_create_chat_bundle(update, context, service, text)
 
 
 async def _process_remove_everywhere(
@@ -732,6 +737,62 @@ async def _process_set_rights(
         return
 
     await update.message.reply_text("Используй кнопки выбора прав или отмени действие.", reply_markup=build_cancel_keyboard())
+
+
+async def _process_create_chat_bundle(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    service: MembershipService,
+    raw_title: str,
+) -> None:
+    title = raw_title.strip()
+    if not title:
+        await update.message.reply_text("Название не может быть пустым. Введите корректное название чата.")
+        return
+
+    inside_title = f"{title} — Inside"
+    await service.add_manual_user_by_username("tishkova_vondo")
+
+    chats = await service.list_active_chats()
+    target_titles = {title, inside_title}
+    matched_chat_ids = [chat.chat_id for chat in chats if (chat.title or "").strip() in target_titles]
+
+    _clear_pending_action(context)
+    lines = [
+        "Готово. Шаблон набора чатов сформирован:",
+        f"- {title}",
+        f"- {inside_title}",
+        "",
+        "⚠️ Ограничение Telegram Bot API:",
+        "Бот не может сам создавать группы/чаты и не может сам добавлять пользователя по @username в чат.",
+        "",
+        "Что делать дальше:",
+        "1) Создай эти два чата вручную.",
+        "2) Добавь в оба чата бота и @tishkova_vondo.",
+        "3) После этого нажми /refresh_groups и выполни назначение прав.",
+    ]
+
+    if matched_chat_ids:
+        scope = ",".join(str(chat_id) for chat_id in matched_chat_ids)
+        lines.extend(
+            [
+                "",
+                "Обнаружены подходящие чаты в базе (по названию).",
+                "Для назначения admin-прав @tishkova_vondo можешь использовать:",
+                f"/promote_admin {scope} tishkova_vondo",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "Пока подходящие чаты не найдены в базе.",
+                "После добавления бота в чаты и /refresh_groups команда для назначения будет такой:",
+                "/promote_admin all tishkova_vondo",
+            ]
+        )
+
+    await update.message.reply_text("\n".join(lines), reply_markup=build_main_keyboard(_is_owner(update, context)))
 
 
 async def on_left_chat_member_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

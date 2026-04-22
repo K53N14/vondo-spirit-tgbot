@@ -7,6 +7,7 @@ from bot.handlers.admin import (
 from bot.handlers.chat_member import on_chat_member_update, on_my_chat_member_update
 from bot.handlers.common import (
     add_users_command,
+    create_chat_bundle_command,
     delete_user_command,
     groups_command,
     help_command,
@@ -33,6 +34,7 @@ __all__ = [
     "start_command",
     "help_command",
     "add_users_command",
+    "create_chat_bundle_command",
     "delete_user_command",
     "sync_me_command",
     "groups_command",
