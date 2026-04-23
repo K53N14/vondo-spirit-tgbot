@@ -17,6 +17,24 @@ DEFAULT_ADMIN_RIGHTS: dict[str, bool] = {
     "can_manage_topics": True,
 }
 
+FULL_ADMIN_RIGHTS: dict[str, bool] = {
+    "is_anonymous": False,
+    "can_manage_chat": True,
+    "can_delete_messages": True,
+    "can_manage_video_chats": True,
+    "can_restrict_members": True,
+    "can_promote_members": True,
+    "can_change_info": True,
+    "can_invite_users": True,
+    "can_post_stories": True,
+    "can_edit_stories": True,
+    "can_delete_stories": True,
+    "can_post_messages": True,
+    "can_edit_messages": True,
+    "can_pin_messages": True,
+    "can_manage_topics": True,
+}
+
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_user is None:
         return False
@@ -83,8 +101,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "(только OWNER_USER_IDS).\n"
         "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
         "(только OWNER_USER_IDS).\n"
-        "/apply_admins_here — в текущем чате назначить дефолтные admin-права всем пользователям из БД, "
-        "кто присутствует в чате, и затем применить rank из БД (если есть).\n"
+        "/apply_admins_here — в текущем чате обновить admin-права только текущим администраторам из БД: "
+        "модераторам выставляются FULL_ADMIN_RIGHTS, остальным — DEFAULT_ADMIN_RIGHTS; затем применяется rank из БД (если есть).\n"
         "/invite_me — отправить вам инвайт-ссылки в дефолтный список чатов (если вы есть в БД)."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
@@ -652,6 +670,7 @@ async def apply_admins_here_command(update: Update, context: ContextTypes.DEFAUL
 
     service: MembershipService = context.application.bot_data["membership_service"]
     users = await service.list_users()
+    moderators = set(await service.list_moderator_usernames())
     if not users:
         await update.message.reply_text("В базе нет пользователей.")
         return
@@ -671,12 +690,14 @@ async def apply_admins_here_command(update: Update, context: ContextTypes.DEFAUL
             skipped += 1
             continue
 
-        if member.status not in {"creator", "administrator", "member", "restricted"}:
+        if member.status not in {"creator", "administrator"}:
             skipped += 1
             continue
 
         try:
-            await context.bot.promote_chat_member(chat_id=chat_id, user_id=user.id, **DEFAULT_ADMIN_RIGHTS)
+            user_username = (user.username or "").lower()
+            rights = FULL_ADMIN_RIGHTS if user_username in moderators else DEFAULT_ADMIN_RIGHTS
+            await context.bot.promote_chat_member(chat_id=chat_id, user_id=user.id, **rights)
             rank = await service.get_membership_admin_rank(chat_id=chat_id, user_id=user.id)
             if rank:
                 try:
