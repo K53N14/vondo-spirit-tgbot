@@ -101,8 +101,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "(только OWNER_USER_IDS).\n"
         "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
         "(только OWNER_USER_IDS).\n"
-        "/apply_admins_here — в текущем чате обновить admin-права только текущим администраторам из БД: "
-        "модераторам выставляются FULL_ADMIN_RIGHTS, остальным — DEFAULT_ADMIN_RIGHTS; затем применяется rank из БД (если есть).\n"
+        "/apply_admins_here — в текущем чате применить права как в /set_admin_rights для всех участников из БД, "
+        "кто состоит в чате: модераторам выставляются FULL_ADMIN_RIGHTS, остальным — DEFAULT_ADMIN_RIGHTS; "
+        "затем применяется rank из БД (если есть).\n"
         "/invite_me — отправить вам инвайт-ссылки в дефолтный список чатов (если вы есть в БД)."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
@@ -690,7 +691,7 @@ async def apply_admins_here_command(update: Update, context: ContextTypes.DEFAUL
             skipped += 1
             continue
 
-        if member.status not in {"creator", "administrator"}:
+        if member.status not in {"creator", "administrator", "member", "restricted"}:
             skipped += 1
             continue
 
