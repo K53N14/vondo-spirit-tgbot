@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import Chat, InviteTargetChat, Membership, User
+from bot.db.models import Chat, InviteTargetChat, Membership, ModeratorUser, User
 
 
 @dataclass(frozen=True)
@@ -209,3 +209,33 @@ class MembershipRepository:
     async def list_invite_target_chat_ids(self) -> list[int]:
         rows = await self.session.execute(select(InviteTargetChat.chat_id).order_by(InviteTargetChat.chat_id.asc()))
         return list(rows.scalars().all())
+
+    async def add_moderator_username(self, username: str) -> None:
+        normalized = username.strip().lstrip("@").lower()
+        if not normalized:
+            return
+        existing = await self.session.get(ModeratorUser, normalized)
+        if existing is None:
+            self.session.add(ModeratorUser(username=normalized))
+
+    async def remove_moderator_username(self, username: str) -> bool:
+        normalized = username.strip().lstrip("@").lower()
+        existing = await self.session.get(ModeratorUser, normalized)
+        if existing is None:
+            return False
+        await self.session.delete(existing)
+        return True
+
+    async def list_moderator_usernames(self) -> list[str]:
+        rows = await self.session.execute(select(ModeratorUser.username).order_by(ModeratorUser.username.asc()))
+        return list(rows.scalars().all())
+
+    async def get_membership_admin_rank(self, chat_id: int, user_id: int) -> Optional[str]:
+        stmt = select(Membership.admin_rank).where(Membership.chat_id == chat_id, Membership.user_id == user_id)
+        return await self.session.scalar(stmt)
+
+    async def set_membership_admin_rank(self, chat_id: int, user_id: int, admin_rank: Optional[str]) -> None:
+        stmt = select(Membership).where(Membership.chat_id == chat_id, Membership.user_id == user_id)
+        membership = await self.session.scalar(stmt)
+        if membership is not None:
+            membership.admin_rank = admin_rank

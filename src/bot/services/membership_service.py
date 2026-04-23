@@ -160,3 +160,32 @@ class MembershipService:
         async with self.session_factory() as session:
             repo = MembershipRepository(session)
             return await repo.list_invite_target_chat_ids()
+
+    async def add_moderator_username(self, username: str) -> None:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            await repo.add_moderator_username(username)
+            await session.commit()
+
+    async def remove_moderator_username(self, username: str) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            removed = await repo.remove_moderator_username(username)
+            await session.commit()
+            return removed
+
+    async def list_moderator_usernames(self) -> list[str]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.list_moderator_usernames()
+
+    async def get_membership_admin_rank(self, chat_id: int, user_id: int) -> Optional[str]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.get_membership_admin_rank(chat_id, user_id)
+
+    async def set_membership_admin_rank(self, chat_id: int, user_id: int, admin_rank: Optional[str]) -> None:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            await repo.set_membership_admin_rank(chat_id, user_id, admin_rank)
+            await session.commit()

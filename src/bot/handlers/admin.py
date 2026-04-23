@@ -264,6 +264,7 @@ async def set_admin_rank_command(update: Update, context: ContextTypes.DEFAULT_T
                 user_id=target_user.id,
                 custom_title=rank,
             )
+            await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
             success.append(chat_id)
         except Exception as exc:
             failed.append(f"{chat_id}: {exc}")

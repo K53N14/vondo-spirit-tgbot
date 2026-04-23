@@ -13,11 +13,15 @@ from bot.handlers import (
     delete_user_command,
     groups_command,
     help_command,
+    apply_admins_here_command,
     invite_groups_add_command,
     invite_groups_command,
     invite_groups_remove_command,
     invite_me_command,
     list_users_command,
+    moderators_add_command,
+    moderators_command,
+    moderators_remove_command,
     on_chat_member_update,
     on_my_chat_member_update,
     on_action_input,
@@ -76,10 +80,14 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("add_users", add_users_command))
     app.add_handler(CommandHandler("create_chat_bundle", create_chat_bundle_command))
+    app.add_handler(CommandHandler("apply_admins_here", apply_admins_here_command))
     app.add_handler(CommandHandler("invite_groups_add", invite_groups_add_command))
     app.add_handler(CommandHandler("invite_groups_remove", invite_groups_remove_command))
     app.add_handler(CommandHandler("invite_groups", invite_groups_command))
     app.add_handler(CommandHandler("invite_me", invite_me_command))
+    app.add_handler(CommandHandler("moderators_add", moderators_add_command))
+    app.add_handler(CommandHandler("moderators_remove", moderators_remove_command))
+    app.add_handler(CommandHandler("moderators", moderators_command))
     app.add_handler(CommandHandler("delete_user", delete_user_command))
     app.add_handler(CommandHandler("sync_me", sync_me_command))
     app.add_handler(CommandHandler("sync_everyone", sync_everyone_command))

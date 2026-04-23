@@ -55,3 +55,10 @@ class InviteTargetChat(Base):
 
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ModeratorUser(Base):
+    __tablename__ = "moderator_users"
+
+    username: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
