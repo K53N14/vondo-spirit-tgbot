@@ -21,6 +21,7 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
         chat=chat_member_updated.chat,
         user=chat_member_updated.new_chat_member.user,
         status=chat_member_updated.new_chat_member.status,
+        admin_rank=getattr(chat_member_updated.new_chat_member, "custom_title", None),
     )
 
     await service.save_member_update(snapshot)
@@ -51,5 +52,6 @@ async def on_my_chat_member_update(update: Update, context: ContextTypes.DEFAULT
         full_name=my_update.new_chat_member.user.full_name,
         is_bot=my_update.new_chat_member.user.is_bot,
         status=status,
+        admin_rank=getattr(my_update.new_chat_member, "custom_title", None),
     )
     logger.info("bot_chat_state_saved chat_id=%s status=%s", my_update.chat.id, status)

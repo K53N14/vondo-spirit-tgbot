@@ -663,6 +663,7 @@ async def _process_set_rank(
     for chat_id in chat_ids:
         try:
             await context.bot.set_chat_administrator_custom_title(chat_id=chat_id, user_id=target_user.id, custom_title=rank)
+            await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
             success += 1
         except Exception as exc:
             failed.append(f"{chat_id}: {exc}")

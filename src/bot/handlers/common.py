@@ -6,12 +6,47 @@ from telegram.ext import ContextTypes
 from bot.services.membership_service import MembershipService
 from bot.handlers.ui import build_main_keyboard
 
+DEFAULT_ADMIN_RIGHTS: dict[str, bool] = {
+    "can_change_info": True,
+    "can_pin_messages": True,
+    "can_post_stories": True,
+}
+
+FULL_ADMIN_RIGHTS: dict[str, bool] = {
+    "is_anonymous": False,
+    "can_manage_chat": True,
+    "can_delete_messages": True,
+    "can_manage_video_chats": True,
+    "can_restrict_members": True,
+    "can_promote_members": True,
+    "can_change_info": True,
+    "can_invite_users": True,
+    "can_post_stories": True,
+    "can_edit_stories": True,
+    "can_delete_stories": True,
+    "can_post_messages": True,
+    "can_edit_messages": True,
+    "can_pin_messages": True,
+    "can_manage_topics": True,
+}
 
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_user is None:
         return False
     owner_ids: set[int] = context.application.bot_data["owner_user_ids"]
     return update.effective_user.id in owner_ids
+
+
+async def _is_owner_or_chat_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    if _is_owner(update, context):
+        return True
+    if update.effective_chat is None or update.effective_user is None:
+        return False
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+        return member.status in {"creator", "administrator"}
+    except Exception:
+        return False
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -39,6 +74,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/help — список команд и их описание.\n"
         "/add_users <username ...> — вручную добавить одного или нескольких пользователей по username в БД (только OWNER_USER_IDS).\n"
         "/create_chat_bundle — запустить мастер создания набора чатов по названию (только OWNER_USER_IDS).\n"
+        "/invite_groups_add <chat_id ...> — добавить чаты в дефолтный список приглашений (только OWNER_USER_IDS).\n"
+        "/invite_groups_remove <chat_id ...> — удалить чаты из дефолтного списка приглашений (только OWNER_USER_IDS).\n"
+        "/invite_groups — показать дефолтный список приглашений (только OWNER_USER_IDS).\n"
+        "/moderators_add <username ...> — добавить пользователей в список модераторов (только OWNER_USER_IDS).\n"
+        "/moderators_remove <username ...> — удалить пользователей из списка модераторов (только OWNER_USER_IDS).\n"
+        "/moderators — показать список модераторов (только OWNER_USER_IDS).\n"
         "/users — показать всех пользователей, сохраненных в БД (только OWNER_USER_IDS).\n"
         "/delete_user <username> — удалить пользователя из БД (только OWNER_USER_IDS).\n"
         "/sync_me — синхронизировать ваш id/имя и членство по всем известным чатам бота.\n"
@@ -54,7 +95,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/set_admin_rank <chat_id|all> <username> <rank> — установить custom title (rank) администратора "
         "(только OWNER_USER_IDS).\n"
         "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
-        "(только OWNER_USER_IDS)."
+        "(только OWNER_USER_IDS).\n"
+        "/apply_admins_here — в текущем чате применить права как множественный /set_admin_rights для всех "
+        "участников из БД, кто состоит в чате: модераторам выставляются FULL_ADMIN_RIGHTS, "
+        "остальным — DEFAULT_ADMIN_RIGHTS.\n"
+        "/invite_me — отправить вам инвайт-ссылки в дефолтный список чатов (если вы есть в БД)."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
 
@@ -180,6 +225,7 @@ async def sync_me_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 full_name=update.effective_user.full_name,
                 is_bot=update.effective_user.is_bot,
                 status=status,
+                admin_rank=getattr(member, "custom_title", None),
             )
             synced += 1
             if status in {"creator", "administrator", "member", "restricted"}:
@@ -268,6 +314,7 @@ async def sync_everyone_command(update: Update, context: ContextTypes.DEFAULT_TY
                     full_name=user.full_name,
                     is_bot=False,
                     status=member.status,
+                    admin_rank=getattr(member, "custom_title", None),
                 )
                 synced_statuses += 1
             except Exception as exc:
@@ -432,6 +479,231 @@ async def user_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     lines = [f"Чаты пользователя @{username} (id={user.id}):"]
     for chat in chats:
         title = chat.title or "(без названия)"
-        lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type} | status={chat.status}")
+        rank = chat.admin_rank or "-"
+        lines.append(f"- {title} | chat_id={chat.chat_id} | type={chat.chat_type} | status={chat.status} | rank={rank}")
 
+    await update.message.reply_text("\n".join(lines))
+
+
+async def invite_groups_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+    if not context.args:
+        await update.message.reply_text("Использование: /invite_groups_add <chat_id1> [chat_id2] ...")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    added: list[int] = []
+    for raw in context.args:
+        try:
+            chat_id = int(raw)
+        except ValueError:
+            continue
+        await service.add_invite_target_chat(chat_id)
+        added.append(chat_id)
+
+    if not added:
+        await update.message.reply_text("Не удалось добавить ни одного chat_id.")
+        return
+    await update.message.reply_text("Добавлены в дефолтный список приглашений:\n" + "\n".join(f"- {c}" for c in added))
+
+
+async def invite_groups_remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+    if not context.args:
+        await update.message.reply_text("Использование: /invite_groups_remove <chat_id1> [chat_id2] ...")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    removed: list[int] = []
+    for raw in context.args:
+        try:
+            chat_id = int(raw)
+        except ValueError:
+            continue
+        if await service.remove_invite_target_chat(chat_id):
+            removed.append(chat_id)
+
+    if not removed:
+        await update.message.reply_text("Ничего не удалено (chat_id не найдены в списке).")
+        return
+    await update.message.reply_text("Удалены из дефолтного списка приглашений:\n" + "\n".join(f"- {c}" for c in removed))
+
+
+async def invite_groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    chat_ids = await service.list_invite_target_chat_ids()
+    if not chat_ids:
+        await update.message.reply_text("Дефолтный список приглашений пуст.")
+        return
+    await update.message.reply_text("Дефолтный список приглашений:\n" + "\n".join(f"- {c}" for c in chat_ids))
+
+
+async def invite_me_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_user is None:
+        return
+
+    username = (update.effective_user.username or "").strip()
+    if not username:
+        await update.message.reply_text("У вас не установлен username в Telegram.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    user = await service.get_user_by_username(username)
+    if user is None:
+        await update.message.reply_text("Ваш username не найден в базе. Попросите администратора добавить вас.")
+        return
+
+    chat_ids = await service.list_invite_target_chat_ids()
+    if not chat_ids:
+        await update.message.reply_text("Список чатов для приглашений пока пуст.")
+        return
+
+    links: list[str] = []
+    failed: list[str] = []
+    for chat_id in chat_ids:
+        try:
+            invite = await context.bot.create_chat_invite_link(chat_id=chat_id)
+            links.append(f"- {chat_id}: {invite.invite_link}")
+        except Exception as exc:
+            failed.append(f"{chat_id}: {exc}")
+
+    lines = ["Инвайт-ссылки в дефолтные чаты:"]
+    if links:
+        lines.extend(links)
+    if failed:
+        lines.append("")
+        lines.append(f"Ошибок: {len(failed)}")
+        lines.extend([f"- {item}" for item in failed[:10]])
+    await update.message.reply_text("\n".join(lines))
+
+
+async def moderators_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+    if not context.args:
+        await update.message.reply_text("Использование: /moderators_add <username1> [username2] ...")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    added: list[str] = []
+    for raw in context.args:
+        username = raw.strip().lstrip("@").lower()
+        if not username:
+            continue
+        await service.add_moderator_username(username)
+        added.append(username)
+
+    if not added:
+        await update.message.reply_text("Не удалось добавить ни одного модератора.")
+        return
+    await update.message.reply_text("Добавлены модераторы:\n" + "\n".join(f"- @{u}" for u in added))
+
+
+async def moderators_remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+    if not context.args:
+        await update.message.reply_text("Использование: /moderators_remove <username1> [username2] ...")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    removed: list[str] = []
+    for raw in context.args:
+        username = raw.strip().lstrip("@").lower()
+        if not username:
+            continue
+        if await service.remove_moderator_username(username):
+            removed.append(username)
+
+    if not removed:
+        await update.message.reply_text("Ничего не удалено: модераторы не найдены.")
+        return
+    await update.message.reply_text("Удалены из модераторов:\n" + "\n".join(f"- @{u}" for u in removed))
+
+
+async def moderators_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None:
+        return
+    if not _is_owner(update, context):
+        await update.message.reply_text("У вас нет прав для этой команды.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    moderators = await service.list_moderator_usernames()
+    if not moderators:
+        await update.message.reply_text("Список модераторов пуст.")
+        return
+    await update.message.reply_text("Модераторы:\n" + "\n".join(f"- @{u}" for u in moderators))
+
+
+async def apply_admins_here_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.effective_chat is None:
+        return
+
+    if not await _is_owner_or_chat_admin(update, context):
+        await update.message.reply_text("Только владелец бота или админ этого чата может выполнить команду.")
+        return
+
+    service: MembershipService = context.application.bot_data["membership_service"]
+    users = await service.list_users()
+    moderators = set(await service.list_moderator_usernames())
+    if not users:
+        await update.message.reply_text("В базе нет пользователей.")
+        return
+
+    chat_id = update.effective_chat.id
+    applied = 0
+    skipped = 0
+    failed: list[str] = []
+
+    for user in users:
+        if user.id <= 0:
+            skipped += 1
+            continue
+        try:
+            member = await context.bot.get_chat_member(chat_id, user.id)
+        except Exception:
+            skipped += 1
+            continue
+
+        if member.status not in {"creator", "administrator", "member", "restricted"}:
+            skipped += 1
+            continue
+
+        try:
+            user_username = (user.username or "").lower()
+            rights = FULL_ADMIN_RIGHTS if user_username in moderators else DEFAULT_ADMIN_RIGHTS
+            await context.bot.promote_chat_member(chat_id=chat_id, user_id=user.id, **rights)
+            applied += 1
+        except Exception as exc:
+            failed.append(f"user={user.id}: {exc}")
+
+    lines = [
+        "Применение admin-прав в текущем чате завершено.",
+        f"Применено: {applied}",
+        f"Пропущено: {skipped}",
+        f"Ошибок: {len(failed)}",
+    ]
+    if failed:
+        lines.extend([f"- {item}" for item in failed[:10]])
     await update.message.reply_text("\n".join(lines))

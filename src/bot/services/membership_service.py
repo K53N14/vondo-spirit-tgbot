@@ -14,6 +14,7 @@ class MemberSnapshot:
     chat: Chat
     user: User
     status: str
+    admin_rank: Optional[str] = None
 
 
 class MembershipService:
@@ -42,6 +43,7 @@ class MembershipService:
                 user_id=snapshot.user.id,
                 status=snapshot.status,
                 is_current=is_current,
+                admin_rank=snapshot.admin_rank,
             )
             await session.commit()
 
@@ -56,6 +58,7 @@ class MembershipService:
         full_name: str,
         is_bot: bool,
         status: str,
+        admin_rank: Optional[str] = None,
     ) -> None:
         is_current = status in {"creator", "administrator", "member", "restricted"}
 
@@ -63,7 +66,13 @@ class MembershipService:
             repo = MembershipRepository(session)
             await repo.upsert_chat(chat_id=chat_id, title=chat_title, chat_type=chat_type, is_active=True)
             await repo.upsert_user(user_id=user_id, username=username, full_name=full_name, is_bot=is_bot)
-            await repo.upsert_membership(chat_id=chat_id, user_id=user_id, status=status, is_current=is_current)
+            await repo.upsert_membership(
+                chat_id=chat_id,
+                user_id=user_id,
+                status=status,
+                is_current=is_current,
+                admin_rank=admin_rank,
+            )
             await session.commit()
 
     async def upsert_user_profile(self, user_id: int, username: Optional[str], full_name: str, is_bot: bool) -> None:
@@ -133,3 +142,50 @@ class MembershipService:
                 return None, []
             chats = await repo.list_user_active_chats(user.id)
             return user, chats
+
+    async def add_invite_target_chat(self, chat_id: int) -> None:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            await repo.add_invite_target_chat(chat_id)
+            await session.commit()
+
+    async def remove_invite_target_chat(self, chat_id: int) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            removed = await repo.remove_invite_target_chat(chat_id)
+            await session.commit()
+            return removed
+
+    async def list_invite_target_chat_ids(self) -> list[int]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.list_invite_target_chat_ids()
+
+    async def add_moderator_username(self, username: str) -> None:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            await repo.add_moderator_username(username)
+            await session.commit()
+
+    async def remove_moderator_username(self, username: str) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            removed = await repo.remove_moderator_username(username)
+            await session.commit()
+            return removed
+
+    async def list_moderator_usernames(self) -> list[str]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.list_moderator_usernames()
+
+    async def get_membership_admin_rank(self, chat_id: int, user_id: int) -> Optional[str]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.get_membership_admin_rank(chat_id, user_id)
+
+    async def set_membership_admin_rank(self, chat_id: int, user_id: int, admin_rank: Optional[str]) -> None:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            await repo.set_membership_admin_rank(chat_id, user_id, admin_rank)
+            await session.commit()
