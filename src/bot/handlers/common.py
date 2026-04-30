@@ -14,9 +14,9 @@ DEFAULT_ADMIN_RIGHTS: dict[str, bool] = {
 
 FULL_ADMIN_RIGHTS: dict[str, bool] = {
     "is_anonymous": False,
-    "can_manage_chat": True,
+    # "can_manage_chat": True,
     "can_delete_messages": True,
-    "can_manage_video_chats": True,
+    # "can_manage_video_chats": True,
     "can_restrict_members": True,
     "can_promote_members": True,
     "can_change_info": True,
@@ -25,9 +25,9 @@ FULL_ADMIN_RIGHTS: dict[str, bool] = {
     "can_edit_stories": True,
     "can_delete_stories": True,
     "can_post_messages": True,
-    "can_edit_messages": True,
+    # "can_edit_messages": True,
     "can_pin_messages": True,
-    "can_manage_topics": True,
+    # "can_manage_topics": True,
 }
 
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
