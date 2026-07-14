@@ -255,22 +255,33 @@ async def set_admin_rank_command(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("У пользователя нет реального Telegram user_id. Сначала выполните /sync_me.")
         return
 
+    raw_scope = context.args[0].strip().lower()
+    apply_global_rank = raw_scope == "all"
+    if apply_global_rank:
+        await service.set_user_admin_rank(user_id=target_user.id, admin_rank=rank)
+
     success: list[int] = []
     failed: list[str] = []
     for chat_id in target_chat_ids:
         try:
+            effective_rank = rank
+            if apply_global_rank:
+                membership_rank = await service.get_membership_admin_rank(chat_id=chat_id, user_id=target_user.id)
+                effective_rank = membership_rank or rank
             await context.bot.set_chat_administrator_custom_title(
                 chat_id=chat_id,
                 user_id=target_user.id,
-                custom_title=rank,
+                custom_title=effective_rank,
             )
-            await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
+            if not apply_global_rank:
+                await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
             success.append(chat_id)
         except Exception as exc:
             failed.append(f"{chat_id}: {exc}")
 
     lines = [
         f"Установка rank '{rank}' для @{username} завершена.",
+        f"Режим: {'all (основной rank в users + fallback по memberships)' if apply_global_rank else 'выбранные чаты (rank в memberships)'}",
         f"Успешно: {len(success)}",
         f"Ошибок: {len(failed)}",
     ]

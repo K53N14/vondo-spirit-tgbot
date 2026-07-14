@@ -14,6 +14,7 @@ class StoredUser:
     id: int
     username: Optional[str]
     full_name: str
+    admin_rank: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -140,7 +141,7 @@ class MembershipRepository:
         stmt: Select[tuple[User]] = select(User).order_by(User.username.asc().nulls_last(), User.full_name.asc())
         rows = await self.session.scalars(stmt)
         users = rows.all()
-        return [StoredUser(id=u.id, username=u.username, full_name=u.full_name) for u in users]
+        return [StoredUser(id=u.id, username=u.username, full_name=u.full_name, admin_rank=u.admin_rank) for u in users]
 
     async def get_user_by_username(self, username: str) -> Optional[StoredUser]:
         normalized = username.lstrip("@")
@@ -148,7 +149,7 @@ class MembershipRepository:
         user = await self.session.scalar(stmt)
         if user is None:
             return None
-        return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
+        return StoredUser(id=user.id, username=user.username, full_name=user.full_name, admin_rank=user.admin_rank)
 
     async def add_manual_user_by_username(self, username: str) -> StoredUser:
         normalized = username.strip().lstrip("@")
@@ -168,7 +169,7 @@ class MembershipRepository:
         )
         self.session.add(user)
         await self.session.flush()
-        return StoredUser(id=user.id, username=user.username, full_name=user.full_name)
+        return StoredUser(id=user.id, username=user.username, full_name=user.full_name, admin_rank=user.admin_rank)
 
     async def delete_user_by_username(self, username: str) -> bool:
         normalized = username.strip().lstrip("@")
@@ -239,3 +240,14 @@ class MembershipRepository:
         membership = await self.session.scalar(stmt)
         if membership is not None:
             membership.admin_rank = admin_rank
+
+    async def set_user_admin_rank(self, user_id: int, admin_rank: Optional[str]) -> bool:
+        user = await self.session.get(User, user_id)
+        if user is None:
+            return False
+        user.admin_rank = admin_rank
+        return True
+
+    async def get_user_admin_rank(self, user_id: int) -> Optional[str]:
+        stmt = select(User.admin_rank).where(User.id == user_id)
+        return await self.session.scalar(stmt)

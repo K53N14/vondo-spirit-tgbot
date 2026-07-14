@@ -189,3 +189,15 @@ class MembershipService:
             repo = MembershipRepository(session)
             await repo.set_membership_admin_rank(chat_id, user_id, admin_rank)
             await session.commit()
+
+    async def set_user_admin_rank(self, user_id: int, admin_rank: Optional[str]) -> bool:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            updated = await repo.set_user_admin_rank(user_id, admin_rank)
+            await session.commit()
+            return updated
+
+    async def get_user_admin_rank(self, user_id: int) -> Optional[str]:
+        async with self.session_factory() as session:
+            repo = MembershipRepository(session)
+            return await repo.get_user_admin_rank(user_id)

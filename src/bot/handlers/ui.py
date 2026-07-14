@@ -161,6 +161,7 @@ def _clear_pending_action(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop("pending_username", None)
     context.user_data.pop("pending_rights", None)
     context.user_data.pop("pending_target_chat_ids", None)
+    context.user_data.pop("pending_scope_is_all", None)
     context.user_data.pop("pending_rights_allowed", None)
 
 
@@ -629,6 +630,7 @@ async def _process_set_rank(
         if scope_error:
             await update.message.reply_text(scope_error, reply_markup=build_cancel_keyboard())
             return
+        context.user_data["pending_scope_is_all"] = user_input.strip().lower() == "all"
         context.user_data["pending_target_chat_ids"] = target_chat_ids
         context.user_data["pending_stage"] = "rank"
         await update.message.reply_text(
@@ -649,6 +651,7 @@ async def _process_set_rank(
         return
 
     chat_ids = context.user_data.get("pending_target_chat_ids") or await _get_user_chat_ids(service, username)
+    scope_is_all = bool(context.user_data.get("pending_scope_is_all", False))
     if not chat_ids:
         _clear_pending_action(context)
         await update.message.reply_text(
@@ -660,16 +663,33 @@ async def _process_set_rank(
     success = 0
     failed: list[str] = []
 
+    if scope_is_all:
+        await service.set_user_admin_rank(user_id=target_user.id, admin_rank=rank)
+
     for chat_id in chat_ids:
         try:
-            await context.bot.set_chat_administrator_custom_title(chat_id=chat_id, user_id=target_user.id, custom_title=rank)
-            await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
+            effective_rank = rank
+            if scope_is_all:
+                membership_rank = await service.get_membership_admin_rank(chat_id=chat_id, user_id=target_user.id)
+                effective_rank = membership_rank or rank
+            await context.bot.set_chat_administrator_custom_title(
+                chat_id=chat_id,
+                user_id=target_user.id,
+                custom_title=effective_rank,
+            )
+            if not scope_is_all:
+                await service.set_membership_admin_rank(chat_id=chat_id, user_id=target_user.id, admin_rank=rank)
             success += 1
         except Exception as exc:
             failed.append(f"{chat_id}: {exc}")
 
     _clear_pending_action(context)
-    lines = [f"Rank '{rank}' для @{username} установлен.", f"Успешно: {success}", f"Ошибок: {len(failed)}"]
+    lines = [
+        f"Rank '{rank}' для @{username} установлен.",
+        f"Режим: {'all (основной rank в users + fallback по memberships)' if scope_is_all else 'выбранные чаты (rank в memberships)'}",
+        f"Успешно: {success}",
+        f"Ошибок: {len(failed)}",
+    ]
     if failed:
         lines.extend(["Первые ошибки:"] + [f"- {item}" for item in failed[:10]])
 

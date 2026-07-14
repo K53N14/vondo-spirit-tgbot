@@ -14,9 +14,9 @@ DEFAULT_ADMIN_RIGHTS: dict[str, bool] = {
 
 FULL_ADMIN_RIGHTS: dict[str, bool] = {
     "is_anonymous": False,
-    "can_manage_chat": True,
+    # "can_manage_chat": True,
     "can_delete_messages": True,
-    "can_manage_video_chats": True,
+    # "can_manage_video_chats": True,
     "can_restrict_members": True,
     "can_promote_members": True,
     "can_change_info": True,
@@ -25,9 +25,9 @@ FULL_ADMIN_RIGHTS: dict[str, bool] = {
     "can_edit_stories": True,
     "can_delete_stories": True,
     "can_post_messages": True,
-    "can_edit_messages": True,
+    # "can_edit_messages": True,
     "can_pin_messages": True,
-    "can_manage_topics": True,
+    # "can_manage_topics": True,
 }
 
 def _is_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -93,12 +93,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/promote_admin <chat_id|all> <username> — назначить пользователя из БД администратором "
         "(только OWNER_USER_IDS).\n"
         "/set_admin_rank <chat_id|all> <username> <rank> — установить custom title (rank) администратора "
-        "(только OWNER_USER_IDS).\n"
+        "(all: основной rank в users, выбранные чаты: rank в memberships; только OWNER_USER_IDS).\n"
         "/set_admin_rights <chat_id|all> <username> <right=true|false ...> — изменить права администратора "
         "(только OWNER_USER_IDS).\n"
         "/apply_admins_here — в текущем чате применить права как множественный /set_admin_rights для всех "
         "участников из БД, кто состоит в чате: модераторам выставляются FULL_ADMIN_RIGHTS, "
-        "остальным — DEFAULT_ADMIN_RIGHTS.\n"
+        "остальным — DEFAULT_ADMIN_RIGHTS; после этого применяется rank из БД (если есть).\n"
         "/invite_me — отправить вам инвайт-ссылки в дефолтный список чатов (если вы есть в БД)."
     )
     await update.message.reply_text(text, reply_markup=build_main_keyboard(_is_owner(update, context)))
@@ -694,6 +694,14 @@ async def apply_admins_here_command(update: Update, context: ContextTypes.DEFAUL
             user_username = (user.username or "").lower()
             rights = FULL_ADMIN_RIGHTS if user_username in moderators else DEFAULT_ADMIN_RIGHTS
             await context.bot.promote_chat_member(chat_id=chat_id, user_id=user.id, **rights)
+            rank = await service.get_membership_admin_rank(chat_id=chat_id, user_id=user.id)
+            if not rank:
+                rank = user.admin_rank
+            if rank:
+                try:
+                    await context.bot.set_chat_administrator_custom_title(chat_id=chat_id, user_id=user.id, custom_title=rank)
+                except Exception:
+                    pass
             applied += 1
         except Exception as exc:
             failed.append(f"user={user.id}: {exc}")

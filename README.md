@@ -65,7 +65,7 @@ python -m bot.main
 - `/moderators_add <username ...>` — добавить пользователей в список модераторов (для OWNER_USER_IDS).
 - `/moderators_remove <username ...>` — удалить пользователей из списка модераторов (для OWNER_USER_IDS).
 - `/moderators` — показать список модераторов (для OWNER_USER_IDS).
-- `/apply_admins_here` — в текущем чате применить права как множественный `/set_admin_rights` для всех участников из БД, кто состоит в чате: модераторам выставляются `FULL_ADMIN_RIGHTS`, остальным — `DEFAULT_ADMIN_RIGHTS`.
+- `/apply_admins_here` — в текущем чате применить права как множественный `/set_admin_rights` для всех участников из БД, кто состоит в чате: модераторам выставляются `FULL_ADMIN_RIGHTS`, остальным — `DEFAULT_ADMIN_RIGHTS`; после этого применяется rank из БД (если есть).
 - `/users` — показать всех пользователей, сохраненных в БД (для OWNER_USER_IDS).
 - `/delete_user <username>` — удалить пользователя из базы данных (для OWNER_USER_IDS).
 - `/sync_me` — синхронизировать ваш id/имя и участие в известных группах/каналах бота (только если ваш username уже есть в БД).
@@ -76,7 +76,9 @@ python -m bot.main
 - `/user_groups <username>` — показать, в каких группах/каналах состоит пользователь по логину (для OWNER_USER_IDS).
 - `/remove_everywhere <username>` — удалить пользователя из всех известных активных чатов по username (для OWNER_USER_IDS).
 - `/promote_admin <chat_id|all|chat_id,chat_id,...> <username>` — назначить пользователя из БД администратором в указанном чате или во всех активных (для OWNER_USER_IDS).
-- `/set_admin_rank <chat_id|all|chat_id,chat_id,...> <username> <rank>` — задать custom title (rank) администратору в чате/группе/канале (для OWNER_USER_IDS).
+- `/set_admin_rank <chat_id|all|chat_id,chat_id,...> <username> <rank>` — задать custom title (rank) администратору:
+  - если `all`: сохранить основной rank в `users.admin_rank` (не меняя `memberships.admin_rank`) и применить его как fallback там, где в `memberships` rank пуст;
+  - если выбраны конкретные чаты: сохранить rank в `memberships.admin_rank` для этих чатов (для OWNER_USER_IDS).
 - `/set_admin_rights <chat_id|all|chat_id,chat_id,...> <username> <right=true|false ...>` — изменить права администратора, например `can_delete_messages=true` (для OWNER_USER_IDS).
 
 
